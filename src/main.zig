@@ -12,11 +12,17 @@ const Lineup = @import("team.zig").Lineup;
 
 const APIResponse = struct {
     teams: []Team,
-    elements: []Player,
+    elements: []Element,
 
     const Team = struct {
         code: u32,
         name: []const u8,
+    };
+    const Element = struct {
+        code: u32,
+        web_name: []const u8,
+        team_code: u16,
+        element_type: u8,
     };
 };
 
@@ -46,8 +52,20 @@ pub fn main() !void {
     var player_map = std.StringHashMapUnmanaged(Player).empty;
     defer player_map.deinit(allocator);
 
-    for (resp.value.elements) |player| {
-        try player_map.put(allocator, player.web_name, player);
+    var team_map = std.AutoHashMapUnmanaged(u32, []const u8).empty;
+    defer team_map.deinit(allocator);
+
+    for (resp.value.teams) |team| {
+        try team_map.put(allocator, team.code, team.name);
+    }
+
+    for (resp.value.elements) |element| {
+        const player = Player{
+            .name = element.web_name,
+            .position = Player.Position.fromElementType(element.element_type),
+            .team_name = team_map.get(element.team_code) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team_code}),
+        };
+        try player_map.put(allocator, player.name, player);
     }
 
     // Terminal stuff
@@ -184,6 +202,9 @@ pub fn main() !void {
                                     active_table = .left;
                                     filtered.makeActive();
                                     selected.makeNormal();
+                                } else if (key.matches(Key.enter, .{})) {
+                                    // append player
+                                    lineup.remove(selected.context.row);
                                 }
                             },
                         }
@@ -232,8 +253,9 @@ pub fn main() !void {
             .width = win.width / 2,
             .height = win.height,
         });
-
-        const players = std.ArrayList(Player).fromOwnedSlice(allocator, &lineup.players);
+        var buf: [15]Player.StringPlayer = undefined;
+        lineup.toString(&buf);
+        const players = std.ArrayList(Player.StringPlayer).fromOwnedSlice(allocator, &buf);
 
         try selected.draw(event_alloc, win, selected_win, players);
 
