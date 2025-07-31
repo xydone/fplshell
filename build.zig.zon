@@ -1,0 +1,23 @@
+.{
+    .name = .fplshell,
+    .minimum_zig_version = "0.14.0",
+    .version = "0.0.0",
+
+    .dependencies = .{
+        .vaxis = .{
+            .url = "git+https://github.com/rockorager/libvaxis.git#7d8015ee82bd547e92b433fc698ce86a0d87b18b",
+            .hash = "vaxis-0.5.1-BWNV_CIVCQC3Bk1-nguTPlKtXmm7AyPOZd95Ut2KYLVD",
+        },
+        .tls = .{
+            .url = "git+https://github.com/ianic/tls.zig#602f05bd84d819d487a6e22dd1463e907f7992ab",
+            .hash = "tls-0.1.0-ER2e0sR3BQAaKutV0MShEsWhgG5NkNc04OTCEwHUson3",
+        },
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+    .fingerprint = 0x63482cbf0d72cbbc,
+}
