@@ -69,7 +69,7 @@ pub fn main() !void {
     for (resp.value.elements) |element| {
         const player = Player{
             .name = element.web_name,
-            .position = Player.Position.fromElementType(element.element_type),
+            .position = Player.fromElementType(element.element_type),
             .team_name = team_map.get(element.team_code) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team_code}),
         };
         try player_map.put(allocator, player.name, player);
@@ -171,7 +171,7 @@ pub fn main() !void {
                                 // go to line
                                 if (std.mem.eql(u8, "go", command)) {
                                     const line_token = it.next() orelse break :cmd;
-                                    const line = try std.fmt.parseInt(u16, line_token, 10);
+                                    const line = std.fmt.parseInt(u16, line_token, 10) catch break :cmd;
                                     filtered.context.row = line;
                                 }
                                 // search command
@@ -256,9 +256,9 @@ pub fn main() !void {
             .width = win.width / 2,
             .height = win.height,
         });
-        var buf: [15]Player.StringPlayer = undefined;
+        var buf: [15]Player = undefined;
         lineup.toString(&buf);
-        const players = std.ArrayList(Player.StringPlayer).fromOwnedSlice(allocator, &buf);
+        const players = std.ArrayList(Player).fromOwnedSlice(allocator, &buf);
 
         try selected.draw(event_alloc, win, selected_win, players);
 

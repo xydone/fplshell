@@ -38,7 +38,7 @@ pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
         .row_bg_1 = normal_table,
         .row_bg_2 = normal_table,
         .selected_bg = selected_row,
-        .header_names = .{ .custom = &.{ "ID", "Name", "Team ID" } },
+        .header_names = .{ .custom = &.{ "Position", "Name", "Team" } },
         .col_indexes = .{ .by_idx = &.{ 0, 1, 2 } },
     };
     return Self{

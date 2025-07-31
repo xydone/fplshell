@@ -2,47 +2,37 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 pub const Player = struct {
-    position: Position,
+    position: []const u8,
     name: []const u8,
     team_name: []const u8,
+
+    pub fn fromElementType(element_type: u8) []const u8 {
+        return switch (element_type) {
+            1 => "Goalkeeper",
+            2 => "Defender",
+            3 => "Midfielder",
+            4 => "Forward",
+            else => unreachable,
+        };
+    }
 
     pub const Position = enum {
         gk,
         def,
         mid,
         fwd,
-        pub fn fromElementType(element_type: u8) Position {
-            return switch (element_type) {
-                1 => .gk,
-                2 => .def,
-                3 => .mid,
-                4 => .fwd,
-                else => unreachable,
-            };
-        }
-        pub fn toString(position: Position) []const u8 {
-            return switch (position) {
-                .gk => "Goalkeeper",
-                .def => "Defender",
-                .mid => "Midfielder",
-                .fwd => "Forward",
-            };
+        pub fn fromString(buf: []const u8) Position {
+            if (std.mem.eql(u8, "Goalkeeper", buf)) return .gk;
+            if (std.mem.eql(u8, "Defender", buf)) return .def;
+            if (std.mem.eql(u8, "Midfielder", buf)) return .mid;
+            if (std.mem.eql(u8, "Forward", buf)) return .fwd;
+            unreachable;
         }
     };
-
-    fn toString(self: Player) StringPlayer {
-        return .{ .name = self.name, .team_name = self.team_name, .position = Position.toString(self.position) };
+    pub const empty: Player = .{ .position = "", .name = "", .team_name = "" };
+    fn isEmpty(player: Player) bool {
+        return std.mem.eql(u8, player.name, "");
     }
-
-    pub const StringPlayer = struct {
-        position: []const u8,
-        name: []const u8,
-        team_name: []const u8,
-        const empty: StringPlayer = .{ .position = "", .name = "", .team_name = "" };
-        fn isEmpty(player: Player) bool {
-            return std.mem.eql(u8, player.name, "");
-        }
-    };
 };
 
 pub const Lineup = struct {
@@ -54,11 +44,11 @@ pub const Lineup = struct {
         };
     }
 
-    pub fn toString(self: Lineup, buf: *[15]Player.StringPlayer) void {
+    pub fn toString(self: Lineup, buf: *[15]Player) void {
         for (self.players, 0..) |player, i| {
             if (player) |pl| {
-                buf[i] = pl.toString();
-            } else buf[i] = Player.StringPlayer.empty;
+                buf[i] = pl;
+            } else buf[i] = Player.empty;
         }
     }
 
@@ -69,7 +59,7 @@ pub const Lineup = struct {
         var fwd_count: u4 = 0;
         for (self.players) |player| {
             if (player) |pl| {
-                switch (pl.position) {
+                switch (Player.Position.fromString(pl.position)) {
                     .gk => gk_count += 1,
                     .def => def_count += 1,
                     .mid => mid_count += 1,
