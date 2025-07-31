@@ -4,31 +4,34 @@ const Allocator = std.mem.Allocator;
 const vaxis = @import("vaxis");
 const Window = vaxis.Window;
 const Segment = vaxis.Cell.Segment;
-const Color = vaxis.Cell.Color;
 const Table = vaxis.widgets.Table;
-const Context = Table.TableContext;
+const Color = vaxis.Cell.Color;
+
+pub const TableContext = Table.TableContext;
 
 const Player = @import("../team.zig").Player;
 const Lineup = @import("../team.zig").Lineup;
 
+const Colors = @import("../colors.zig");
+
 segment: Segment,
-context: *Context,
+context: *TableContext,
 
 const Self = @This();
 
 // Colors
-const active_row: Color = .{ .rgb = .{ 50, 133, 166 } };
-const selected_row: Color = .{ .rgb = .{ 0, 0, 0 } };
+const active_row: Color = Colors.light_blue;
+const selected_row: Color = Colors.black;
 
-const selected_table: Color = .{ .rgb = .{ 12, 12, 12 } };
-const normal_table: Color = .{ .rgb = .{ 8, 8, 8 } };
+const selected_table: Color = Colors.gray;
+const normal_table: Color = Colors.light_gray;
 
 pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
     const segment = Segment{
         .text = segment_text,
         .style = .{},
     };
-    const context = try allocator.create(Context);
+    const context = try allocator.create(TableContext);
     context.* = .{
         .active_bg = active_row,
         .active_fg = .{ .rgb = .{ 0, 0, 0 } },

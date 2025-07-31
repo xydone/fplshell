@@ -7,8 +7,11 @@ const TextInput = vaxis.widgets.TextInput;
 const Key = vaxis.Key;
 
 const Table = @import("components/table.zig");
+const TableContext = Table.TableContext;
 
 const Lineup = @import("team.zig").Lineup;
+
+const Colors = @import("colors.zig");
 
 const APIResponse = struct {
     teams: []Team,
@@ -26,9 +29,10 @@ const APIResponse = struct {
     };
 };
 
-const State = enum {
-    active,
-    typing,
+const Menu = enum {
+    search_table,
+    selected,
+    cmd,
 };
 
 pub fn main() !void {
@@ -59,6 +63,9 @@ pub fn main() !void {
         try team_map.put(allocator, team.code, team.name);
     }
 
+    var all_players = std.ArrayList(Player).init(allocator);
+    defer all_players.deinit();
+
     for (resp.value.elements) |element| {
         const player = Player{
             .name = element.web_name,
@@ -66,6 +73,8 @@ pub fn main() !void {
             .team_name = team_map.get(element.team_code) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team_code}),
         };
         try player_map.put(allocator, player.name, player);
+        // by default add all players to the initial filter
+        try all_players.append(player);
     }
 
     // Terminal stuff
@@ -89,18 +98,16 @@ pub fn main() !void {
 
     try vx.enterAltScreen(tty.anyWriter());
 
-    var text_input = TextInput.init(allocator, &vx.unicode);
-    defer text_input.deinit();
+    var cmd_input = TextInput.init(allocator, &vx.unicode);
+    defer cmd_input.deinit();
 
     try vx.queryTerminal(tty.anyWriter(), 1 * std.time.ns_per_s);
 
-    var filtered_players = std.ArrayList(Player).init(allocator);
+    var filtered_players = try all_players.clone();
     defer filtered_players.deinit();
 
     var event_arena = std.heap.ArenaAllocator.init(allocator);
     defer event_arena.deinit();
-
-    var state: State = .typing;
 
     var filtered = try Table.init(allocator, "Select a player");
     defer filtered.deinit(allocator);
@@ -109,10 +116,9 @@ pub fn main() !void {
     var selected = try Table.init(allocator, "Selected players");
     defer selected.deinit(allocator);
 
-    const Tables = enum { left, right };
-    var active_table: Tables = .left;
-
     var lineup: Lineup = .init();
+
+    var active_menu: Menu = .search_table;
 
     while (true) {
         defer _ = event_arena.reset(.retain_capacity);
@@ -121,92 +127,105 @@ pub fn main() !void {
         const event_alloc = event_arena.allocator();
         const event = loop.nextEvent();
 
-        event: switch (event) {
+        switch (event) {
             .key_press => |key| {
                 if (key.matches('c', .{ .ctrl = true })) {
                     break;
                 }
-                // row navigation
-                if (key.matches(Key.up, .{})) {
-                    switch (active_table) {
-                        .left => {
-                            filtered.context.row -|= 1;
-                        },
-                        .right => {
-                            selected.context.row -|= 1;
-                        },
-                    }
-                } else if (key.matches(Key.down, .{})) {
-                    switch (active_table) {
-                        .left => {
-                            filtered.context.row +|= 1;
-                        },
-                        .right => {
-                            selected.context.row +|= 1;
-                        },
+                row_navigation: {
+                    var context: *TableContext = switch (active_menu) {
+                        .search_table => filtered.context,
+                        .selected => selected.context,
+                        else => break :row_navigation,
+                    };
+
+                    if (key.matches(Key.up, .{})) {
+                        context.row -|= 1;
+                    } else if (key.matches(Key.down, .{})) {
+                        context.row +|= 1;
                     }
                 }
 
-                switch (state) {
-                    .typing => {
-                        // go to active state
-                        if (key.matches(Key.tab, .{})) {
-                            state = .active;
-                        } else if (key.matches(Key.enter, .{})) {
-                            // append player
+                // enter cmd mode
+                if (active_menu != .cmd and key.matchesAny(&.{ ':', '/' }, .{})) {
+                    active_menu = .cmd;
+                }
+
+                switch (active_menu) {
+                    .cmd => cmd: {
+                        if (key.matchExact(vaxis.Key.enter, .{})) {
+                            //default to making the active menu, after enter is clicked, the search table
+                            active_menu = .search_table;
+                            const message = try cmd_input.toOwnedSlice();
+                            defer allocator.free(message);
+
+                            if (message.len == 0) break :cmd;
+
+                            const arg = message[1..];
+                            if (std.mem.eql(u8, "q", arg) or
+                                std.mem.eql(u8, "quit", arg) or
+                                std.mem.eql(u8, "exit", arg)) return;
+
+                            var it = std.mem.tokenizeSequence(u8, arg, " ");
+                            if (it.next()) |command| {
+                                // go to line
+                                if (std.mem.eql(u8, "go", command)) {
+                                    const line_token = it.next() orelse break :cmd;
+                                    const line = try std.fmt.parseInt(u16, line_token, 10);
+                                    filtered.context.row = line;
+                                }
+                                // search command
+                                else if (std.mem.eql(u8, "search", command) or std.mem.eql(u8, "s", command)) {
+                                    const string = it.rest();
+                                    filtered.context.row = 0;
+
+                                    // if nothing has been entered, just continue early
+                                    filtered_players.clearRetainingCapacity();
+                                    if (string.len == 0) break :cmd;
+
+                                    const input = try std.ascii.allocLowerString(event_alloc, string);
+                                    var player_it = player_map.iterator();
+                                    while (player_it.next()) |entry| {
+                                        const entry_name = try std.ascii.allocLowerString(event_alloc, entry.key_ptr.*);
+
+                                        if (std.mem.containsAtLeast(u8, entry_name, 1, input)) {
+                                            try filtered_players.append(entry.value_ptr.*);
+                                        }
+                                    }
+                                }
+                                // reset filter to all players
+                                else if (std.mem.eql(u8, "reset", command) or std.mem.eql(u8, "res", command) or std.mem.eql(u8, "r", command)) {
+                                    filtered_players.clearAndFree();
+                                    try filtered_players.appendSlice(all_players.items);
+                                }
+                            }
+                        } else {
+                            // add the text into the buffer
+                            try cmd_input.update(.{ .key_press = key });
+                        }
+                    },
+                    .search_table => {
+                        if (key.matchExact(Key.enter, .{})) {
                             lineup.appendAny(filtered_players.items[filtered.context.row]) catch {
                                 //TODO: signify selection full somehow?
                             };
-                        } else {
-                            try text_input.update(.{ .key_press = key });
-                            filtered.context.row = 0;
-                            const buf = text_input.buf.firstHalf();
-
-                            // if nothing has been entered, just continue early
-                            filtered_players.clearRetainingCapacity();
-                            if (buf.len == 0) break :event;
-
-                            const input = try std.ascii.allocLowerString(event_alloc, text_input.buf.firstHalf());
-                            var it = player_map.iterator();
-                            while (it.next()) |entry| {
-                                const entry_name = try std.ascii.allocLowerString(event_alloc, entry.key_ptr.*);
-
-                                if (std.mem.containsAtLeast(u8, entry_name, 1, input)) {
-                                    try filtered_players.append(entry.value_ptr.*);
-                                }
-                            }
+                        } else if (key.matches(Key.right, .{})) {
+                            active_menu = .selected;
+                            selected.makeActive();
+                            filtered.makeNormal();
+                        } else if (key.matchExact(Key.enter, .{})) {
+                            lineup.appendAny(filtered_players.items[filtered.context.row]) catch {
+                                //TODO: signify selection full somehow?
+                            };
                         }
                     },
-                    .active => {
-                        // go back to typing state
-                        if (key.matches(Key.tab, .{})) {
-                            state = .typing;
-                        }
-
-                        // table navigation
-                        switch (active_table) {
-                            .left => {
-                                if (key.matches(Key.right, .{})) {
-                                    active_table = .right;
-                                    selected.makeActive();
-                                    filtered.makeNormal();
-                                } else if (key.matches(Key.enter, .{})) {
-                                    // append player
-                                    lineup.appendAny(filtered_players.items[filtered.context.row]) catch {
-                                        //TODO: signify selection full somehow?
-                                    };
-                                }
-                            },
-                            .right => {
-                                if (key.matches(Key.left, .{})) {
-                                    active_table = .left;
-                                    filtered.makeActive();
-                                    selected.makeNormal();
-                                } else if (key.matches(Key.enter, .{})) {
-                                    // append player
-                                    lineup.remove(selected.context.row);
-                                }
-                            },
+                    .selected => {
+                        if (key.matches(Key.left, .{})) {
+                            active_menu = .search_table;
+                            filtered.makeActive();
+                            selected.makeNormal();
+                        } else if (key.matchExact(Key.enter, .{})) {
+                            lineup.remove(selected.context.row);
                         }
                     },
                 }
@@ -220,23 +239,6 @@ pub fn main() !void {
 
         win.clear();
 
-        const style: vaxis.Style = .{
-            .fg = .{ .rgb = .{ 64, 128, 255 } },
-        };
-
-        const child = win.child(.{
-            .x_off = win.width / 2 - 20,
-            .y_off = 0,
-            .width = 40,
-            .height = 3,
-            .border = .{
-                .where = .all,
-                .style = style,
-            },
-        });
-
-        text_input.draw(child);
-
         // left table
         const filtered_win = win.child(.{
             .x_off = 1,
@@ -246,6 +248,7 @@ pub fn main() !void {
         });
 
         try filtered.draw(event_alloc, win, filtered_win, filtered_players);
+
         // right table
         const selected_win = win.child(.{
             .x_off = filtered_win.width + filtered_win.x_off + 2,
@@ -258,6 +261,18 @@ pub fn main() !void {
         const players = std.ArrayList(Player.StringPlayer).fromOwnedSlice(allocator, &buf);
 
         try selected.draw(event_alloc, win, selected_win, players);
+
+        // bottom bar
+        if (active_menu == .cmd) {
+            const bottom_bar = win.child(.{
+                .x_off = 0,
+                .y_off = win.height - 1,
+                .width = win.width,
+                .height = 1,
+            });
+            bottom_bar.fill(.{ .style = .{ .bg = Colors.light_blue } });
+            cmd_input.draw(bottom_bar);
+        }
 
         const tty_writer = tty_buf_writer.writer().any();
 
