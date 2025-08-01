@@ -152,7 +152,7 @@ pub fn main() !void {
                 }
 
                 // enter cmd mode
-                if (active_menu != .cmd and key.matchesAny(&.{ ':', '/' }, .{})) {
+                if (active_menu != .cmd and key.matchesAny(&.{ ':', ';', '/' }, .{})) {
                     active_menu = .cmd;
                 }
 
@@ -185,8 +185,8 @@ pub fn main() !void {
                                     filtered.moveTo(0);
 
                                     // if nothing has been entered, just continue early
-                                    filtered_players.clearRetainingCapacity();
                                     if (string.len == 0) break :cmd;
+                                    filtered_players.clearRetainingCapacity();
 
                                     const input = try std.ascii.allocLowerString(event_alloc, string);
                                     var player_it = player_map.iterator();
@@ -224,13 +224,28 @@ pub fn main() !void {
                             };
                         }
                     },
-                    .selected => {
+                    .selected => selected: {
                         if (key.matches(Key.left, .{})) {
                             active_menu = .search_table;
                             filtered.makeActive();
                             selected.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
                             lineup.remove(selected.context.row);
+                        } else if (key.matchExact(Key.space, .{})) {
+                            const rows = selected.context.sel_rows orelse {
+                                selected.context.sel_rows = try allocator.alloc(u16, 1);
+                                selected.context.sel_rows.?[0] = selected.context.row;
+                                break :selected;
+                            };
+                            defer {
+                                allocator.free(selected.context.sel_rows.?);
+                                selected.context.sel_rows = null;
+                            }
+                            // if we click an already selected one, unselect
+                            if (selected.context.row == rows[0]) break :selected;
+
+                            // if we are still here, swap them
+                            std.mem.swap(?Player, &lineup.players[selected.context.row], &lineup.players[rows[0]]);
                         }
                     },
                 }

@@ -216,7 +216,7 @@ fn drawInner(
                 break :rowColors .{ table_ctx.active_fg, Colors.brighten(bg, 50) };
             if (table_ctx.sel_rows) |rows| {
                 if (mem.indexOfScalar(u16, rows, @intCast(table_ctx.start + row)) != null)
-                    break :rowColors .{ table_ctx.selected_fg, table_ctx.selected_bg };
+                    break :rowColors .{ table_ctx.selected_fg, Colors.darken(bg, 80) };
             }
             break :rowColors .{ fg, bg };
         };

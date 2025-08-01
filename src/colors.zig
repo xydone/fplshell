@@ -34,13 +34,30 @@ pub fn getTextColor(color: Color) Color {
 }
 
 /// Clamped to 255
-pub fn brighten(color: Color, amount: u8) Color {
-    const r = color.rgb[0];
-    const g = color.rgb[1];
-    const b = color.rgb[2];
+pub inline fn brighten(color: Color, amount: u8) Color {
+    const r: u16 = @intCast(color.rgb[0]);
+    const g: u16 = @intCast(color.rgb[1]);
+    const b: u16 = @intCast(color.rgb[2]);
     return Color{ .rgb = .{
-        @min(@as(u16, r) + amount, 255),
-        @min(@as(u16, g) + amount, 255),
-        @min(@as(u16, b) + amount, 255),
+        @min(r + amount, 255),
+        @min(g + amount, 255),
+        @min(b + amount, 255),
     } };
+}
+
+/// Clamped to 0
+pub inline fn darken(color: Color, amount: u8) Color {
+    const r: i16 = @intCast(color.rgb[0]);
+    const g: i16 = @intCast(color.rgb[1]);
+    const b: i16 = @intCast(color.rgb[2]);
+
+    const amt: i16 = @intCast(amount);
+
+    return Color{
+        .rgb = .{
+            @intCast(@max(0, r - amt)),
+            @intCast(@max(0, g - amt)),
+            @intCast(@max(0, b - amt)),
+        },
+    };
 }
