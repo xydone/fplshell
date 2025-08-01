@@ -1,6 +1,6 @@
 const std = @import("std");
 const HTTP = @import("http.zig");
-const Player = @import("team.zig").Player;
+const Player = @import("lineup.zig").Player;
 
 const vaxis = @import("vaxis");
 const TextInput = vaxis.widgets.TextInput;
@@ -9,9 +9,10 @@ const Key = vaxis.Key;
 const Table = @import("components/table.zig");
 const TableContext = Table.TableContext;
 
-const Lineup = @import("team.zig").Lineup;
+const Lineup = @import("lineup.zig").Lineup;
 
 const Colors = @import("colors.zig");
+const Teams = @import("fpl.zig").Teams;
 
 const APIResponse = struct {
     teams: []Team,
@@ -67,10 +68,14 @@ pub fn main() !void {
     defer all_players.deinit();
 
     for (resp.value.elements) |element| {
+        const team_name = team_map.get(element.team_code) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team_code});
+        const bg = Teams.fromString(team_name).color();
         const player = Player{
             .name = element.web_name,
             .position = Player.fromElementType(element.element_type),
-            .team_name = team_map.get(element.team_code) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team_code}),
+            .team_name = team_name,
+            .background_color = bg,
+            .foreground_color = Colors.getTextColor(bg),
         };
         try player_map.put(allocator, player.name, player);
         // by default add all players to the initial filter

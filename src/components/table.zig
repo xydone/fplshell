@@ -1,4 +1,8 @@
 const std = @import("std");
+const fmt = std.fmt;
+const heap = std.heap;
+const mem = std.mem;
+const meta = std.meta;
 const Allocator = std.mem.Allocator;
 
 const vaxis = @import("vaxis");
@@ -8,9 +12,10 @@ const Table = vaxis.widgets.Table;
 const Color = vaxis.Cell.Color;
 
 pub const TableContext = Table.TableContext;
+const calcColWidth = Table.calcColWidth;
 
-const Player = @import("../team.zig").Player;
-const Lineup = @import("../team.zig").Lineup;
+const Player = @import("../lineup.zig").Player;
+const Lineup = @import("../lineup.zig").Lineup;
 
 const Colors = @import("../colors.zig");
 
@@ -59,7 +64,8 @@ pub fn makeNormal(self: *Self) void {
     self.context.row_bg_2 = normal_table;
 }
 
-pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, list: anytype) !void {
+pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, list: std.ArrayList(Player)) !void {
+    // prepare things
     const bar = win.child(.{
         .x_off = table_win.x_off,
         .y_off = table_win.y_off - 1,
@@ -74,7 +80,14 @@ pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, l
     );
     _ = aligned.printSegment(self.segment, .{ .wrap = .word });
 
-    try Table.drawTable(
+    // try Table.drawTable(
+    //     allocator,
+    //     table_win,
+    //     list,
+    //     self.context,
+    // );
+
+    try drawInner(
         allocator,
         table_win,
         list,
@@ -85,4 +98,218 @@ pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, l
 pub fn deinit(self: Self, allocator: Allocator) void {
     if (self.context.sel_rows) |rows| allocator.free(rows);
     allocator.destroy(self.context);
+}
+
+/// draw on the screen (fork of libvaxis's Table.Draw)
+fn drawInner(
+    allocator: ?mem.Allocator,
+    /// The parent Window to draw to.
+    win: vaxis.Window,
+    data_list: std.ArrayList(Player),
+    table_ctx: *TableContext,
+    // row_colors: []Color,
+) !void {
+    const fields = meta.fields(Player);
+    const field_indexes = switch (table_ctx.col_indexes) {
+        .all => comptime allIdx: {
+            var indexes_buf: [fields.len]usize = undefined;
+            for (0..fields.len) |idx| indexes_buf[idx] = idx;
+            const indexes = indexes_buf;
+            break :allIdx indexes[0..];
+        },
+        .by_idx => |by_idx| by_idx,
+    };
+
+    // Headers for the Table
+    var hdrs_buf: [fields.len][]const u8 = undefined;
+    const headers = hdrs: {
+        switch (table_ctx.header_names) {
+            .field_names => {
+                for (field_indexes) |f_idx| {
+                    inline for (fields, 0..) |field, idx| {
+                        if (f_idx == idx)
+                            hdrs_buf[idx] = field.name;
+                    }
+                }
+                break :hdrs hdrs_buf[0..];
+            },
+            .custom => |hdrs| break :hdrs hdrs,
+        }
+    };
+
+    const table_win = win.child(.{
+        .y_off = table_ctx.y_off,
+        .width = win.width,
+        .height = win.height,
+    });
+
+    // Headers
+    if (table_ctx.col > headers.len - 1) table_ctx.col = @intCast(headers.len - 1);
+    var col_start: u16 = 0;
+    for (headers[0..], 0..) |hdr_txt, idx| {
+        const col_width = try calcColWidth(
+            @intCast(idx),
+            headers,
+            table_ctx.col_width,
+            table_win,
+        );
+        defer col_start += col_width;
+        const hdr_fg, const hdr_bg = hdrColors: {
+            if (table_ctx.active and idx == table_ctx.col)
+                break :hdrColors .{ table_ctx.active_fg, table_ctx.active_bg }
+            else if (idx % 2 == 0)
+                break :hdrColors .{ .default, table_ctx.hdr_bg_1 }
+            else
+                break :hdrColors .{ .default, table_ctx.hdr_bg_2 };
+        };
+        const hdr_win = table_win.child(.{
+            .x_off = col_start,
+            .y_off = 0,
+            .width = col_width,
+            .height = 1,
+            .border = .{ .where = if (table_ctx.header_borders and idx > 0) .left else .none },
+        });
+        var hdr = switch (table_ctx.header_align) {
+            .left => hdr_win,
+            .center => vaxis.widgets.alignment.center(hdr_win, @min(col_width -| 1, hdr_txt.len +| 1), 1),
+        };
+        hdr_win.fill(.{ .style = .{ .bg = hdr_bg } });
+        var seg = [_]vaxis.Cell.Segment{.{
+            .text = if (hdr_txt.len > col_width and allocator != null) try fmt.allocPrint(allocator.?, "{s}...", .{hdr_txt[0..(col_width -| 4)]}) else hdr_txt,
+            .style = .{
+                .fg = hdr_fg,
+                .bg = hdr_bg,
+                .bold = true,
+                .ul_style = if (idx == table_ctx.col) .single else .dotted,
+            },
+        }};
+        _ = hdr.print(seg[0..], .{ .wrap = .word });
+    }
+
+    // Rows
+    if (table_ctx.active_content_fn == null) table_ctx.active_y_off = 0;
+    const max_items: u16 =
+        if (data_list.items.len > table_win.height -| 1) table_win.height -| 1 else @intCast(data_list.items.len);
+    var end = table_ctx.start + max_items;
+    if (table_ctx.row + table_ctx.active_y_off >= win.height -| 2)
+        end -|= table_ctx.active_y_off;
+    if (end > data_list.items.len) end = @intCast(data_list.items.len);
+    table_ctx.start = tableStart: {
+        if (table_ctx.row == 0)
+            break :tableStart 0;
+        if (table_ctx.row < table_ctx.start)
+            break :tableStart table_ctx.start - (table_ctx.start - table_ctx.row);
+        if (table_ctx.row >= data_list.items.len - 1)
+            table_ctx.row = @intCast(data_list.items.len - 1);
+        if (table_ctx.row >= end)
+            break :tableStart table_ctx.start + (table_ctx.row - end + 1);
+        break :tableStart table_ctx.start;
+    };
+    end = table_ctx.start + max_items;
+    if (table_ctx.row + table_ctx.active_y_off >= win.height -| 2)
+        end -|= table_ctx.active_y_off;
+    if (end > data_list.items.len) end = @intCast(data_list.items.len);
+    table_ctx.start = @min(table_ctx.start, end);
+    table_ctx.active_y_off = 0;
+    for (data_list.items, 0..) |player, row| {
+        const row_fg, const row_bg = rowColors: {
+            const fg = player.foreground_color orelse .default;
+            const bg = player.background_color orelse table_ctx.row_bg_1;
+
+            if (table_ctx.active and table_ctx.start + row == table_ctx.row)
+                break :rowColors .{ table_ctx.active_fg, Colors.brighten(bg, 50) };
+            if (table_ctx.sel_rows) |rows| {
+                if (mem.indexOfScalar(u16, rows, @intCast(table_ctx.start + row)) != null)
+                    break :rowColors .{ table_ctx.selected_fg, table_ctx.selected_bg };
+            }
+            break :rowColors .{ fg, bg };
+        };
+        var row_win = table_win.child(.{
+            .x_off = 0,
+            .y_off = @intCast(1 + row + table_ctx.active_y_off),
+            .width = table_win.width,
+            .height = 1,
+            //.border = .{ .where = if (table_ctx.row_borders) .top else .none },
+        });
+        if (table_ctx.start + row == table_ctx.row) {
+            table_ctx.active_y_off = if (table_ctx.active_content_fn) |content| try content(&row_win, table_ctx.active_ctx) else 0;
+        }
+        col_start = 0;
+        const item_fields = meta.fields(Player);
+        var col_idx: usize = 0;
+        for (field_indexes) |f_idx| {
+            inline for (item_fields[0..], 0..) |item_field, item_idx| contFields: {
+                switch (table_ctx.col_indexes) {
+                    .all => {},
+                    .by_idx => {
+                        if (item_idx != f_idx) break :contFields;
+                    },
+                }
+                defer col_idx += 1;
+                const col_width = try calcColWidth(
+                    item_idx,
+                    headers,
+                    table_ctx.col_width,
+                    table_win,
+                );
+                defer col_start += col_width;
+                const item = @field(player, item_field.name);
+                const ItemT = @TypeOf(item);
+                const item_win = row_win.child(.{
+                    .x_off = col_start,
+                    .y_off = 0,
+                    .width = col_width,
+                    .height = 1,
+                    .border = .{ .where = if (table_ctx.col_borders and col_idx > 0) .left else .none },
+                });
+                const item_txt = switch (ItemT) {
+                    []const u8 => item,
+                    [][]const u8, []const []const u8 => strSlice: {
+                        if (allocator) |_alloc| break :strSlice try fmt.allocPrint(_alloc, "{s}", .{item});
+                        break :strSlice item;
+                    },
+                    else => nonStr: {
+                        switch (@typeInfo(ItemT)) {
+                            .@"enum" => break :nonStr @tagName(item),
+                            .optional => {
+                                const opt_item = item orelse break :nonStr "-";
+                                switch (@typeInfo(ItemT).optional.child) {
+                                    []const u8 => break :nonStr opt_item,
+                                    [][]const u8, []const []const u8 => {
+                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{s}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
+                                    },
+                                    else => {
+                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
+                                    },
+                                }
+                            },
+                            else => {
+                                break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
+                            },
+                        }
+                    },
+                };
+                item_win.fill(.{ .style = .{ .bg = row_bg } });
+                const item_align_win = itemAlignWin: {
+                    const col_align = switch (table_ctx.col_align) {
+                        .all => |all| all,
+                        .by_idx => |aligns| aligns[col_idx],
+                    };
+                    break :itemAlignWin switch (col_align) {
+                        .left => item_win,
+                        .center => center: {
+                            const center = vaxis.widgets.alignment.center(item_win, @min(col_width -| 1, item_txt.len +| 1), 1);
+                            center.fill(.{ .style = .{ .bg = row_bg } });
+                            break :center center;
+                        },
+                    };
+                };
+                var seg = [_]vaxis.Cell.Segment{.{
+                    .text = if (item_txt.len > col_width and allocator != null) try fmt.allocPrint(allocator.?, "{s}...", .{item_txt[0..(col_width -| 4)]}) else item_txt,
+                    .style = .{ .fg = row_fg, .bg = row_bg },
+                }};
+                _ = item_align_win.print(seg[0..], .{ .wrap = .word, .col_offset = table_ctx.cell_x_off });
+            }
+        }
+    }
 }

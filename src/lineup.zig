@@ -1,10 +1,16 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const Colors = @import("colors.zig");
+const Color = Colors.Color;
+const Teams = @import("fpl.zig").Teams;
+
 pub const Player = struct {
     position: []const u8,
     name: []const u8,
     team_name: []const u8,
+    background_color: ?Color,
+    foreground_color: ?Color,
 
     pub fn fromElementType(element_type: u8) []const u8 {
         return switch (element_type) {
@@ -13,6 +19,15 @@ pub const Player = struct {
             3 => "Midfielder",
             4 => "Forward",
             else => unreachable,
+        };
+    }
+
+    pub fn getTeamColor(self: Player) !struct { background: Color, foreground: Color } {
+        if (self.isEmpty()) return error.EmptyPlayer;
+        const bg = Teams.fromString(self.team_name).color();
+        return .{
+            .background = bg,
+            .foreground = Colors.getTextColor(bg),
         };
     }
 
@@ -29,7 +44,13 @@ pub const Player = struct {
             unreachable;
         }
     };
-    pub const empty: Player = .{ .position = "", .name = "", .team_name = "" };
+    pub const empty: Player = .{
+        .position = "",
+        .name = "",
+        .team_name = "",
+        .background_color = null,
+        .foreground_color = null,
+    };
     fn isEmpty(player: Player) bool {
         return std.mem.eql(u8, player.name, "");
     }
