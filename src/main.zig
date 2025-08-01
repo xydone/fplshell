@@ -138,16 +138,16 @@ pub fn main() !void {
                     break;
                 }
                 row_navigation: {
-                    var context: *TableContext = switch (active_menu) {
-                        .search_table => filtered.context,
-                        .selected => selected.context,
+                    var table: *Table = switch (active_menu) {
+                        .search_table => &filtered,
+                        .selected => &selected,
                         else => break :row_navigation,
                     };
 
                     if (key.matches(Key.up, .{})) {
-                        context.row -|= 1;
+                        table.moveUp();
                     } else if (key.matches(Key.down, .{})) {
-                        context.row +|= 1;
+                        table.moveDown();
                     }
                 }
 
@@ -177,12 +177,12 @@ pub fn main() !void {
                                 if (std.mem.eql(u8, "go", command)) {
                                     const line_token = it.next() orelse break :cmd;
                                     const line = std.fmt.parseInt(u16, line_token, 10) catch break :cmd;
-                                    filtered.context.row = line;
+                                    filtered.moveTo(line);
                                 }
                                 // search command
                                 else if (std.mem.eql(u8, "search", command) or std.mem.eql(u8, "s", command)) {
                                     const string = it.rest();
-                                    filtered.context.row = 0;
+                                    filtered.moveTo(0);
 
                                     // if nothing has been entered, just continue early
                                     filtered_players.clearRetainingCapacity();
@@ -247,9 +247,9 @@ pub fn main() !void {
         // left table
         const filtered_win = win.child(.{
             .x_off = 1,
-            .y_off = 5,
+            .y_off = 2,
             .width = win.width / 2,
-            .height = win.height,
+            .height = win.height / 2,
         });
 
         try filtered.draw(event_alloc, win, filtered_win, filtered_players);

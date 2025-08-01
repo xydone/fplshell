@@ -27,7 +27,6 @@ pub fn build(b: *std.Build) void {
         .name = "fplshell",
         .root_module = module,
     });
-    exe.linkLibC();
 
     b.installArtifact(exe);
 

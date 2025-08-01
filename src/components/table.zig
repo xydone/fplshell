@@ -27,7 +27,6 @@ const Self = @This();
 // Colors
 const active_row: Color = Colors.light_blue;
 const selected_row: Color = Colors.black;
-
 const selected_table: Color = Colors.gray;
 const normal_table: Color = Colors.light_gray;
 
@@ -64,6 +63,16 @@ pub fn makeNormal(self: *Self) void {
     self.context.row_bg_2 = normal_table;
 }
 
+pub fn moveDown(self: *Self) void {
+    self.context.row +|= 1;
+}
+pub fn moveUp(self: *Self) void {
+    self.context.row -|= 1;
+}
+pub fn moveTo(self: *Self, to: u16) void {
+    self.context.row = to;
+}
+
 pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, list: std.ArrayList(Player)) !void {
     // prepare things
     const bar = win.child(.{
@@ -80,19 +89,7 @@ pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, l
     );
     _ = aligned.printSegment(self.segment, .{ .wrap = .word });
 
-    // try Table.drawTable(
-    //     allocator,
-    //     table_win,
-    //     list,
-    //     self.context,
-    // );
-
-    try drawInner(
-        allocator,
-        table_win,
-        list,
-        self.context,
-    );
+    try drawInner(allocator, table_win, list, self.context);
 }
 
 pub fn deinit(self: Self, allocator: Allocator) void {
@@ -107,7 +104,6 @@ fn drawInner(
     win: vaxis.Window,
     data_list: std.ArrayList(Player),
     table_ctx: *TableContext,
-    // row_colors: []Color,
 ) !void {
     const fields = meta.fields(Player);
     const field_indexes = switch (table_ctx.col_indexes) {
@@ -211,7 +207,7 @@ fn drawInner(
     if (end > data_list.items.len) end = @intCast(data_list.items.len);
     table_ctx.start = @min(table_ctx.start, end);
     table_ctx.active_y_off = 0;
-    for (data_list.items, 0..) |player, row| {
+    for (data_list.items[table_ctx.start..end], 0..) |player, row| {
         const row_fg, const row_bg = rowColors: {
             const fg = player.foreground_color orelse .default;
             const bg = player.background_color orelse table_ctx.row_bg_1;
