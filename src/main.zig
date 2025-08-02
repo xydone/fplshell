@@ -17,6 +17,7 @@ const Teams = @import("fpl.zig").Teams;
 const Go = @import("commands/go.zig");
 const Search = @import("commands/search.zig");
 const Reset = @import("commands/reset.zig");
+const Position = @import("commands/position.zig");
 
 const APIResponse = struct {
     teams: []Team,
@@ -76,7 +77,8 @@ pub fn main() !void {
         const bg = Teams.fromString(team_name).color();
         const player = Player{
             .name = element.web_name,
-            .position = Player.fromElementType(element.element_type),
+            .position = Player.Position.fromElementType(element.element_type),
+            .position_name = Player.fromElementType(element.element_type),
             .team_name = team_name,
             .team_id = element.team_code,
             .background_color = bg,
@@ -195,6 +197,16 @@ pub fn main() !void {
                                 }) catch break :cmd;
 
                                 if (search) break :cmd;
+
+                                // TODO: error handling
+                                const filter = Position.handle(command, .{
+                                    .it = it,
+                                    .player_table = &filtered,
+                                    .filtered_players = &filtered_players,
+                                    .all_players = all_players,
+                                }) catch break :cmd;
+
+                                if (filter) break :cmd;
 
                                 const reset = Reset.handle(command, .{
                                     .filtered_players = &filtered_players,

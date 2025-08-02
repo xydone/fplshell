@@ -6,21 +6,21 @@ const Color = Colors.Color;
 const Teams = @import("fpl.zig").Teams;
 
 pub const Player = struct {
-    position: []const u8,
+    position_name: []const u8,
     name: []const u8,
     team_name: []const u8,
     // below are fields that will not be displayed on the table
     team_id: u32,
+    position: ?Position,
     background_color: ?Color,
     foreground_color: ?Color,
 
     pub fn fromElementType(element_type: u8) []const u8 {
-        return switch (element_type) {
-            1 => "Goalkeeper",
-            2 => "Defender",
-            3 => "Midfielder",
-            4 => "Forward",
-            else => unreachable,
+        return switch (Position.fromElementType(element_type)) {
+            .gk => "Goalkeeper",
+            .def => "Defender",
+            .mid => "Midfielder",
+            .fwd => "Forward",
         };
     }
 
@@ -45,14 +45,24 @@ pub const Player = struct {
             if (std.mem.eql(u8, "Forward", buf)) return .fwd;
             unreachable;
         }
+        pub fn fromElementType(element_type: u8) Position {
+            return switch (element_type) {
+                1 => .gk,
+                2 => .def,
+                3 => .mid,
+                4 => .fwd,
+                else => unreachable,
+            };
+        }
     };
     pub const empty: Player = .{
-        .position = "",
+        .position_name = "",
         .name = "",
         .team_name = "",
         .team_id = 0,
         .background_color = null,
         .foreground_color = null,
+        .position = null,
     };
     fn isEmpty(player: Player) bool {
         return player.team_id == 0;
@@ -88,7 +98,8 @@ pub const Lineup = struct {
         var team_count: u8 = 0;
         player_loop: for (self.players) |player| {
             if (player) |pl| {
-                switch (Player.Position.fromString(pl.position)) {
+                // do not use this on empty players, pretty please.
+                switch (pl.position.?) {
                     .gk => gk_count += 1,
                     .def => def_count += 1,
                     .mid => mid_count += 1,
