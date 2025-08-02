@@ -18,6 +18,7 @@ const Go = @import("commands/go.zig");
 const Search = @import("commands/search.zig");
 const Reset = @import("commands/reset.zig");
 const Position = @import("commands/position.zig");
+const Sort = @import("commands/sort.zig");
 
 const APIResponse = struct {
     teams: []Team,
@@ -32,6 +33,8 @@ const APIResponse = struct {
         web_name: []const u8,
         team_code: u16,
         element_type: u8,
+        /// stored as an integer, need to do / 10 to get real value
+        now_cost: u8,
     };
 };
 
@@ -79,12 +82,13 @@ pub fn main() !void {
             .name = element.web_name,
             .position = Player.Position.fromElementType(element.element_type),
             .position_name = Player.fromElementType(element.element_type),
+            .price = @as(f32, @floatFromInt(element.now_cost)) / 10,
             .team_name = team_name,
             .team_id = element.team_code,
             .background_color = bg,
             .foreground_color = Colors.getTextColor(bg),
         };
-        try player_map.put(allocator, player.name, player);
+        try player_map.put(allocator, element.web_name, player);
         // by default add all players to the initial filter
         try all_players.append(player);
     }
@@ -197,6 +201,14 @@ pub fn main() !void {
                                 }) catch break :cmd;
 
                                 if (search) break :cmd;
+
+                                // TODO: error handling
+                                const sort = Sort.handle(command, .{
+                                    .it = &it,
+                                    .filtered_players = &filtered_players,
+                                }) catch break :cmd;
+
+                                if (sort) break :cmd;
 
                                 // TODO: error handling
                                 const filter = Position.handle(command, .{

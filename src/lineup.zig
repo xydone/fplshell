@@ -6,11 +6,12 @@ const Color = Colors.Color;
 const Teams = @import("fpl.zig").Teams;
 
 pub const Player = struct {
-    position_name: []const u8,
-    name: []const u8,
-    team_name: []const u8,
+    position_name: ?[]const u8,
+    name: ?[]const u8,
+    team_name: ?[]const u8,
+    price: ?f32,
     // below are fields that will not be displayed on the table
-    team_id: u32,
+    team_id: ?u32,
     position: ?Position,
     background_color: ?Color,
     foreground_color: ?Color,
@@ -31,6 +32,16 @@ pub const Player = struct {
             .background = bg,
             .foreground = Colors.getTextColor(bg),
         };
+    }
+
+    /// assumes non-null prices
+    pub fn lessThan(_: void, lhs: Player, rhs: Player) bool {
+        return lhs.price.? < rhs.price.?;
+    }
+
+    /// assumes non-null prices
+    pub fn greaterThan(_: void, lhs: Player, rhs: Player) bool {
+        return lhs.price.? > rhs.price.?;
     }
 
     pub const Position = enum {
@@ -56,10 +67,11 @@ pub const Player = struct {
         }
     };
     pub const empty: Player = .{
-        .position_name = "",
-        .name = "",
-        .team_name = "",
-        .team_id = 0,
+        .position_name = null,
+        .name = null,
+        .team_name = null,
+        .price = null,
+        .team_id = null,
         .background_color = null,
         .foreground_color = null,
         .position = null,
@@ -115,7 +127,7 @@ pub const Lineup = struct {
                 }
                 // if we are here that means a team was not found inside []teams
                 team_count += 1;
-                teams[team_count] = Team{ .id = pl.team_id };
+                teams[team_count] = Team{ .id = pl.team_id.? };
             }
         }
 

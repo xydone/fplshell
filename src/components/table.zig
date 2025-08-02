@@ -42,8 +42,8 @@ pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
         .row_bg_1 = normal_table,
         .row_bg_2 = normal_table,
         .selected_bg = selected_row,
-        .header_names = .{ .custom = &.{ "Position", "Name", "Team" } },
-        .col_indexes = .{ .by_idx = &.{ 0, 1, 2 } },
+        .header_names = .{ .custom = &.{ "Position", "Name", "Team", "Price" } },
+        .col_indexes = .{ .by_idx = &.{ 0, 1, 2, 3 } },
     };
     return Self{
         .segment = segment,
@@ -273,6 +273,10 @@ fn drawInner(
                                     []const u8 => break :nonStr opt_item,
                                     [][]const u8, []const []const u8 => {
                                         break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{s}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
+                                    },
+                                    // janky!
+                                    f16, f32, f64 => {
+                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{d:.1}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
                                     },
                                     else => {
                                         break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
