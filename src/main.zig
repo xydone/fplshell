@@ -14,6 +14,10 @@ const Lineup = @import("lineup.zig").Lineup;
 const Colors = @import("colors.zig");
 const Teams = @import("fpl.zig").Teams;
 
+const Go = @import("commands/go.zig");
+const Search = @import("commands/search.zig");
+const Reset = @import("commands/reset.zig");
+
 const APIResponse = struct {
     teams: []Team,
     elements: []Element,
@@ -174,36 +178,30 @@ pub fn main() !void {
 
                             var it = std.mem.tokenizeSequence(u8, arg, " ");
                             if (it.next()) |command| {
-                                // go to line
-                                if (std.mem.eql(u8, "go", command)) {
-                                    const line_token = it.next() orelse break :cmd;
-                                    const line = std.fmt.parseInt(u16, line_token, 10) catch break :cmd;
-                                    filtered.moveTo(line);
-                                }
-                                // search command
-                                else if (std.mem.eql(u8, "search", command) or std.mem.eql(u8, "s", command)) {
-                                    const string = it.rest();
-                                    filtered.moveTo(0);
+                                // TODO: error handling
+                                const go = Go.handle(command, .{
+                                    .it = &it,
+                                    .players_table = &filtered,
+                                }) catch break :cmd;
+                                if (go) break :cmd;
 
-                                    // if nothing has been entered, just continue early
-                                    if (string.len == 0) break :cmd;
-                                    filtered_players.clearRetainingCapacity();
+                                // TODO: error handling
+                                const search = Search.handle(command, .{
+                                    .allocator = event_alloc,
+                                    .it = it,
+                                    .player_map = player_map,
+                                    .player_table = &filtered,
+                                    .filtered_players = &filtered_players,
+                                }) catch break :cmd;
 
-                                    const input = try std.ascii.allocLowerString(event_alloc, string);
-                                    var player_it = player_map.iterator();
-                                    while (player_it.next()) |entry| {
-                                        const entry_name = try std.ascii.allocLowerString(event_alloc, entry.key_ptr.*);
+                                if (search) break :cmd;
 
-                                        if (std.mem.containsAtLeast(u8, entry_name, 1, input)) {
-                                            try filtered_players.append(entry.value_ptr.*);
-                                        }
-                                    }
-                                }
-                                // reset filter to all players
-                                else if (std.mem.eql(u8, "reset", command) or std.mem.eql(u8, "res", command) or std.mem.eql(u8, "r", command)) {
-                                    filtered_players.clearAndFree();
-                                    try filtered_players.appendSlice(all_players.items);
-                                }
+                                const reset = Reset.handle(command, .{
+                                    .filtered_players = &filtered_players,
+                                    .all_players = &all_players,
+                                }) catch break :cmd;
+
+                                if (reset) break :cmd;
                             }
                         } else {
                             // add the text into the buffer
