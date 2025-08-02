@@ -9,6 +9,8 @@ pub const Player = struct {
     position: []const u8,
     name: []const u8,
     team_name: []const u8,
+    // below are fields that will not be displayed on the table
+    team_id: u32,
     background_color: ?Color,
     foreground_color: ?Color,
 
@@ -48,11 +50,12 @@ pub const Player = struct {
         .position = "",
         .name = "",
         .team_name = "",
+        .team_id = 0,
         .background_color = null,
         .foreground_color = null,
     };
     fn isEmpty(player: Player) bool {
-        return std.mem.eql(u8, player.name, "");
+        return player.team_id == 0;
     }
 };
 
@@ -74,11 +77,16 @@ pub const Lineup = struct {
     }
 
     pub fn isValid(self: Lineup) bool {
+        const MAX_PER_TEAM = 3;
         var gk_count: u4 = 0;
         var def_count: u4 = 0;
         var mid_count: u4 = 0;
         var fwd_count: u4 = 0;
-        for (self.players) |player| {
+
+        const Team = struct { id: u32, count: u4 = 1 };
+        var teams: [20]Team = undefined;
+        var team_count: u8 = 0;
+        player_loop: for (self.players) |player| {
             if (player) |pl| {
                 switch (Player.Position.fromString(pl.position)) {
                     .gk => gk_count += 1,
@@ -86,6 +94,17 @@ pub const Lineup = struct {
                     .mid => mid_count += 1,
                     .fwd => fwd_count += 1,
                 }
+                for (0..team_count) |i| {
+                    if (teams[i].id == pl.team_id) {
+                        teams[i].count += 1;
+                        // early exit if player count exceeds maximum, continue loop if not
+                        // continueing the loop manually is done to deal with the teams list
+                        if (teams[i].count >= MAX_PER_TEAM) return false else continue :player_loop;
+                    }
+                }
+                // if we are here that means a team was not found inside []teams
+                team_count += 1;
+                teams[team_count] = Team{ .id = pl.team_id };
             }
         }
 
@@ -137,7 +156,9 @@ pub const Lineup = struct {
             try self.appendBench(player);
         };
     }
-    pub fn appendStarter(self: *Lineup, player: Player) AppendErrors!void {
+
+    /// Does not check if lineup is valid.
+    fn appendStarter(self: *Lineup, player: Player) AppendErrors!void {
         for (0..11) |i| {
             if (self.players[i] == null) {
                 self.players[i] = player;
@@ -146,7 +167,9 @@ pub const Lineup = struct {
         }
         return error.SelectionFull;
     }
-    pub fn appendBench(self: *Lineup, player: Player) AppendErrors!void {
+
+    /// Does not check if lineup is valid.
+    fn appendBench(self: *Lineup, player: Player) AppendErrors!void {
         for (11..15) |i| {
             if (self.players[i] == null) {
                 self.players[i] = player;

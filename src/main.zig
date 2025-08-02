@@ -74,6 +74,7 @@ pub fn main() !void {
             .name = element.web_name,
             .position = Player.fromElementType(element.element_type),
             .team_name = team_name,
+            .team_id = element.team_code,
             .background_color = bg,
             .foreground_color = Colors.getTextColor(bg),
         };
