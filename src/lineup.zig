@@ -122,12 +122,12 @@ pub const Lineup = struct {
                         teams[i].count += 1;
                         // early exit if player count exceeds maximum, continue loop if not
                         // continuing the loop manually is done to deal with the teams list
-                        if (teams[i].count >= MAX_PER_TEAM) return false else continue :player_loop;
+                        if (teams[i].count > MAX_PER_TEAM) return false else continue :player_loop;
                     }
                 }
                 // if we are here that means a team was not found inside []teams
-                team_count += 1;
                 teams[team_count] = Team{ .id = pl.team_id.? };
+                team_count += 1;
             }
         }
 

@@ -86,9 +86,8 @@ pub fn main() !void {
         defer team_data.deinit();
 
         for (team_data.value.picks) |pick| {
-            const is_starter = pick.position <= 11;
             const player = player_map.get(pick.element);
-            if (player) |pl| if (is_starter) try lineup.appendStarter(pl) else try lineup.appendBench(pl);
+            if (player) |pl| try lineup.appendAny(pl);
         }
     }
 
