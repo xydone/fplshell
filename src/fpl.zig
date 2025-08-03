@@ -5,6 +5,10 @@ const Color = @import("colors.zig").Color;
 
 const HTTP = @import("http.zig");
 
+/// How old does the stored data have to be for us to request it again
+/// Defaults to 1hr.
+const STALE_AMOUNT = std.time.ns_per_hour * 1;
+
 pub const Teams = enum {
     Arsenal,
     @"Aston Villa",
@@ -100,13 +104,99 @@ pub const GetStatic = struct {
             now_cost: u8,
         };
     };
+    const file_path = "data/get_static.json";
+
+    /// Caller must free
     pub fn call(allocator: Allocator) !std.json.Parsed(Response) {
+        return isStale(Response, allocator, GetStatic.file_path) catch |err| {
+            return switch (err) {
+                error.Stale => try callRaw(allocator),
+                else => err,
+            };
+        };
+    }
+
+    /// Should only be called directly if you want to prevent stale checks
+    pub fn callRaw(allocator: Allocator) !std.json.Parsed(Response) {
         const http = HTTP{
             .url = "https://fantasy.premierleague.com",
             .headers = "",
             .path = "/api/bootstrap-static/",
         };
-
-        return try http.get(allocator, Response, .{ .ignore_unknown_fields = true, .allocate = .alloc_always });
+        const request = try http.get(allocator, Response, .{ .ignore_unknown_fields = true, .allocate = .alloc_always });
+        try saveToFile(allocator, Response, request.value, GetStatic.file_path);
+        return request;
     }
 };
+
+pub const GetFixtures = struct {
+    pub const Response = []struct {
+        id: u32,
+        /// gameweek number
+        event: u32,
+        /// away id
+        team_a: u32,
+        /// home id
+        team_h: u32,
+    };
+    const file_path = "data/get_fixtures.json";
+
+    pub fn call(allocator: Allocator) !std.json.Parsed(Response) {
+        return isStale(Response, allocator, GetFixtures.file_path) catch |err| {
+            return switch (err) {
+                error.Stale => try callRaw(allocator),
+                else => err,
+            };
+        };
+    }
+
+    /// Should only be called directly if you want to prevent stale checks
+    pub fn callRaw(allocator: Allocator) !std.json.Parsed(Response) {
+        const http = HTTP{
+            .url = "https://fantasy.premierleague.com",
+            .headers = "",
+            .path = "/api/fixtures/",
+        };
+
+        const request = try http.get(allocator, Response, .{ .ignore_unknown_fields = true, .allocate = .alloc_always });
+
+        try saveToFile(allocator, Response, request.value, GetFixtures.file_path);
+        return request;
+    }
+};
+
+fn saveToFile(allocator: Allocator, T: type, response: T, path: []const u8) !void {
+    const file = try std.fs.cwd().createFile(path, .{});
+
+    const body_string = try std.json.stringifyAlloc(allocator, response, .{});
+    defer allocator.free(body_string);
+
+    _ = try file.writeAll(body_string);
+}
+
+/// Returns error.Stale if stale, and the type T if not stale
+/// Caller must free.
+fn isStale(
+    T: type,
+    allocator: Allocator,
+    path: []const u8,
+) !std.json.Parsed(T) {
+    // the reason why this function is not really pure is because I want to save a syscall to read the file again if its not stale and we can safely return
+
+    const file = std.fs.cwd().openFile(path, .{}) catch |err| {
+        switch (err) {
+            error.FileNotFound => return error.Stale,
+            else => return err,
+        }
+    };
+    const stat = try file.stat();
+    const mtime = stat.mtime;
+
+    if (std.time.nanoTimestamp() > mtime + STALE_AMOUNT) return error.Stale;
+
+    // 100kb
+    const contents = try file.readToEndAlloc(allocator, 1024 * 100);
+    defer allocator.free(contents);
+
+    return try std.json.parseFromSlice(T, allocator, contents, .{ .allocate = .alloc_always });
+}

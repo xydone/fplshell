@@ -15,8 +15,10 @@ const Lineup = @import("lineup.zig").Lineup;
 const Colors = @import("colors.zig");
 const Teams = @import("fpl.zig").Teams;
 const GetStatic = @import("fpl.zig").GetStatic;
+const GetFixtures = @import("fpl.zig").GetFixtures;
 
 const Go = @import("commands/go.zig");
+const Refresh = @import("commands/refresh.zig");
 const Search = @import("commands/search.zig");
 const Reset = @import("commands/reset.zig");
 const Position = @import("commands/position.zig");
@@ -38,8 +40,11 @@ pub fn main() !void {
     const allocator = allocator_instance.allocator();
 
     // parse all player info
-    const resp = try GetStatic.call(allocator);
-    defer resp.deinit();
+    var static_data = try GetStatic.call(allocator);
+    defer static_data.deinit();
+
+    var fixtures_data = try GetFixtures.call(allocator);
+    defer fixtures_data.deinit();
 
     var player_map = std.AutoHashMapUnmanaged(u32, Player).empty;
     defer player_map.deinit(allocator);
@@ -47,14 +52,14 @@ pub fn main() !void {
     var team_map = std.AutoHashMapUnmanaged(u32, []const u8).empty;
     defer team_map.deinit(allocator);
 
-    for (resp.value.teams) |team| {
+    for (static_data.value.teams) |team| {
         try team_map.put(allocator, team.code, team.name);
     }
 
     var all_players = std.ArrayList(Player).init(allocator);
     defer all_players.deinit();
 
-    for (resp.value.elements) |element| {
+    for (static_data.value.elements) |element| {
         const team_name = team_map.get(element.team_code) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team_code});
         const bg = Teams.fromString(team_name).color();
         const player = Player{
@@ -77,7 +82,7 @@ pub fn main() !void {
 
     readTeam: {
         // if team.json doesn't exist, leave lineup empty
-        const team_data = Config.getTeam(allocator, "team.json") catch break :readTeam;
+        const team_data = Config.getTeam(allocator) catch break :readTeam;
         defer team_data.deinit();
 
         for (team_data.value.picks) |pick| {
@@ -176,14 +181,20 @@ pub fn main() !void {
 
                             var it = std.mem.tokenizeSequence(u8, arg, " ");
                             if (it.next()) |command| {
-                                // TODO: error handling
+                                // TODO: error handling for all commands
                                 const go = Go.handle(command, .{
                                     .it = &it,
                                     .players_table = &filtered,
                                 }) catch break :cmd;
                                 if (go) break :cmd;
 
-                                // TODO: error handling
+                                const refresh = Refresh.handle(command, .{
+                                    .allocator = allocator,
+                                    .static_data = &static_data,
+                                    .fixtures_data = &fixtures_data,
+                                }) catch break :cmd;
+                                if (refresh) break :cmd;
+
                                 const search = Search.handle(command, .{
                                     .allocator = event_alloc,
                                     .it = it,
@@ -194,7 +205,6 @@ pub fn main() !void {
 
                                 if (search) break :cmd;
 
-                                // TODO: error handling
                                 const sort = Sort.handle(command, .{
                                     .it = &it,
                                     .filtered_players = &filtered_players,
@@ -202,7 +212,6 @@ pub fn main() !void {
 
                                 if (sort) break :cmd;
 
-                                // TODO: error handling
                                 const filter = Position.handle(command, .{
                                     .it = it,
                                     .player_table = &filtered,

@@ -1,6 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const team_config_path = "data/team.json";
+
 pub const TeamConfig = struct {
     picks: []Pick,
     picks_last_updated: []const u8,
@@ -26,8 +28,8 @@ pub const TeamConfig = struct {
     };
 };
 
-pub fn getTeam(allocator: Allocator, config_path: []const u8) !std.json.Parsed(TeamConfig) {
-    const file = try std.fs.cwd().readFileAlloc(allocator, config_path, 1024 * 5);
+pub fn getTeam(allocator: Allocator) !std.json.Parsed(TeamConfig) {
+    const file = try std.fs.cwd().readFileAlloc(allocator, team_config_path, 1024 * 5);
     defer allocator.free(file);
 
     return try std.json.parseFromSlice(TeamConfig, allocator, file, .{
