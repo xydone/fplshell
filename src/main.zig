@@ -282,7 +282,13 @@ pub fn main() !void {
             .height = win.height / 2,
         });
 
-        try filtered.draw(event_alloc, win, filtered_win, filtered_players);
+        try filtered.draw(
+            event_alloc,
+            win,
+            filtered_win,
+            filtered_players,
+            false,
+        );
 
         // right table
         const selected_win = win.child(.{
@@ -295,7 +301,13 @@ pub fn main() !void {
         lineup.toString(&buf);
         const players = std.ArrayList(Player).fromOwnedSlice(allocator, &buf);
 
-        try selected.draw(event_alloc, win, selected_win, players);
+        try selected.draw(
+            event_alloc,
+            win,
+            selected_win,
+            players,
+            true,
+        );
 
         // bottom bar
         if (active_menu == .cmd) {

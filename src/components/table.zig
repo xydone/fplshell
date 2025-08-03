@@ -73,7 +73,7 @@ pub fn moveTo(self: *Self, to: u16) void {
     self.context.row = to;
 }
 
-pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, list: std.ArrayList(Player)) !void {
+pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, list: std.ArrayList(Player), is_lineup: bool) !void {
     // prepare things
     const bar = win.child(.{
         .x_off = table_win.x_off,
@@ -87,9 +87,10 @@ pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, l
         win.width,
         win.height,
     );
+
     _ = aligned.printSegment(self.segment, .{ .wrap = .word });
 
-    try drawInner(allocator, table_win, list, self.context);
+    try drawInner(allocator, table_win, list, self.context, is_lineup);
 }
 
 pub fn deinit(self: Self, allocator: Allocator) void {
@@ -104,6 +105,8 @@ fn drawInner(
     win: vaxis.Window,
     data_list: std.ArrayList(Player),
     table_ctx: *TableContext,
+    /// Should this table be treated as a lineup table?
+    is_lineup: bool,
 ) !void {
     const fields = meta.fields(Player);
     const field_indexes = switch (table_ctx.col_indexes) {
@@ -220,19 +223,37 @@ fn drawInner(
             }
             break :rowColors .{ fg, bg };
         };
+
+        col_start = 0;
+        const item_fields = meta.fields(Player);
+        var col_idx: usize = 0;
+
+        const row_y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
         var row_win = table_win.child(.{
             .x_off = 0,
-            .y_off = @intCast(1 + row + table_ctx.active_y_off),
+            .y_off = if (row > 10 and is_lineup) row_y_off + 1 else row_y_off,
             .width = table_win.width,
             .height = 1,
-            //.border = .{ .where = if (table_ctx.row_borders) .top else .none },
         });
         if (table_ctx.start + row == table_ctx.row) {
             table_ctx.active_y_off = if (table_ctx.active_content_fn) |content| try content(&row_win, table_ctx.active_ctx) else 0;
         }
-        col_start = 0;
-        const item_fields = meta.fields(Player);
-        var col_idx: usize = 0;
+
+        // draw a bench line
+        if (row == 10 and is_lineup) {
+            const bench_win = table_win.child(.{
+                .x_off = 1,
+                .y_off = row_y_off + 1, // only increasing by 1 on the line before the bench to make sure this does not offset the entire table
+                .width = table_win.width,
+                .height = 1,
+            });
+
+            const segment = Segment{
+                .text = "Bench",
+                .style = .{},
+            };
+            _ = bench_win.printSegment(segment, .{ .wrap = .word });
+        }
         for (field_indexes) |f_idx| {
             inline for (item_fields[0..], 0..) |item_field, item_idx| contFields: {
                 switch (table_ctx.col_indexes) {
@@ -304,6 +325,7 @@ fn drawInner(
                         },
                     };
                 };
+
                 var seg = [_]vaxis.Cell.Segment{.{
                     .text = if (item_txt.len > col_width and allocator != null) try fmt.allocPrint(allocator.?, "{s}...", .{item_txt[0..(col_width -| 4)]}) else item_txt,
                     .style = .{ .fg = row_fg, .bg = row_bg },
