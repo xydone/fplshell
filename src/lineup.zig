@@ -121,7 +121,7 @@ pub const Lineup = struct {
                     if (teams[i].id == pl.team_id) {
                         teams[i].count += 1;
                         // early exit if player count exceeds maximum, continue loop if not
-                        // continueing the loop manually is done to deal with the teams list
+                        // continuing the loop manually is done to deal with the teams list
                         if (teams[i].count >= MAX_PER_TEAM) return false else continue :player_loop;
                     }
                 }
@@ -181,7 +181,7 @@ pub const Lineup = struct {
     }
 
     /// Does not check if lineup is valid.
-    fn appendStarter(self: *Lineup, player: Player) AppendErrors!void {
+    pub fn appendStarter(self: *Lineup, player: Player) AppendErrors!void {
         for (0..11) |i| {
             if (self.players[i] == null) {
                 self.players[i] = player;
@@ -192,7 +192,7 @@ pub const Lineup = struct {
     }
 
     /// Does not check if lineup is valid.
-    fn appendBench(self: *Lineup, player: Player) AppendErrors!void {
+    pub fn appendBench(self: *Lineup, player: Player) AppendErrors!void {
         for (11..15) |i| {
             if (self.players[i] == null) {
                 self.players[i] = player;

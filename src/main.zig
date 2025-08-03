@@ -1,6 +1,7 @@
 const std = @import("std");
-const HTTP = @import("http.zig");
 const Player = @import("lineup.zig").Player;
+
+const Config = @import("config.zig");
 
 const vaxis = @import("vaxis");
 const TextInput = vaxis.widgets.TextInput;
@@ -13,30 +14,13 @@ const Lineup = @import("lineup.zig").Lineup;
 
 const Colors = @import("colors.zig");
 const Teams = @import("fpl.zig").Teams;
+const GetStatic = @import("fpl.zig").GetStatic;
 
 const Go = @import("commands/go.zig");
 const Search = @import("commands/search.zig");
 const Reset = @import("commands/reset.zig");
 const Position = @import("commands/position.zig");
 const Sort = @import("commands/sort.zig");
-
-const APIResponse = struct {
-    teams: []Team,
-    elements: []Element,
-
-    const Team = struct {
-        code: u32,
-        name: []const u8,
-    };
-    const Element = struct {
-        code: u32,
-        web_name: []const u8,
-        team_code: u16,
-        element_type: u8,
-        /// stored as an integer, need to do / 10 to get real value
-        now_cost: u8,
-    };
-};
 
 const Menu = enum {
     search_table,
@@ -53,16 +37,11 @@ pub fn main() !void {
 
     const allocator = allocator_instance.allocator();
 
-    const http = HTTP{
-        .url = "https://fantasy.premierleague.com",
-        .headers = "",
-        .path = "/api/bootstrap-static/",
-    };
-
-    const resp = try http.get(allocator, APIResponse, .{ .ignore_unknown_fields = true, .allocate = .alloc_always });
+    // parse all player info
+    const resp = try GetStatic.call(allocator);
     defer resp.deinit();
 
-    var player_map = std.StringHashMapUnmanaged(Player).empty;
+    var player_map = std.AutoHashMapUnmanaged(u32, Player).empty;
     defer player_map.deinit(allocator);
 
     var team_map = std.AutoHashMapUnmanaged(u32, []const u8).empty;
@@ -88,9 +67,24 @@ pub fn main() !void {
             .background_color = bg,
             .foreground_color = Colors.getTextColor(bg),
         };
-        try player_map.put(allocator, element.web_name, player);
+        try player_map.put(allocator, element.id, player);
         // by default add all players to the initial filter
         try all_players.append(player);
+    }
+
+    // read team data from config
+    var lineup: Lineup = .init();
+
+    readTeam: {
+        // if team.json doesn't exist, leave lineup empty
+        const team_data = Config.getTeam(allocator, "team.json") catch break :readTeam;
+        defer team_data.deinit();
+
+        for (team_data.value.picks) |pick| {
+            const is_starter = pick.position <= 11;
+            const player = player_map.get(pick.element);
+            if (player) |pl| if (is_starter) try lineup.appendStarter(pl) else try lineup.appendBench(pl);
+        }
     }
 
     // Terminal stuff
@@ -131,8 +125,6 @@ pub fn main() !void {
 
     var selected = try Table.init(allocator, "Selected players");
     defer selected.deinit(allocator);
-
-    var lineup: Lineup = .init();
 
     var active_menu: Menu = .search_table;
 

@@ -1,5 +1,10 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+
 const Color = @import("colors.zig").Color;
+
+const HTTP = @import("http.zig");
+
 pub const Teams = enum {
     Arsenal,
     @"Aston Villa",
@@ -75,4 +80,33 @@ const team_colors = [_]Color{
     .{ .rgb = .{ 122, 38, 58 } },
     //  wolves
     .{ .rgb = .{ 253, 185, 19 } },
+};
+
+pub const GetStatic = struct {
+    pub const Response = struct {
+        teams: []Team,
+        elements: []Element,
+
+        const Team = struct {
+            code: u32,
+            name: []const u8,
+        };
+        const Element = struct {
+            id: u32,
+            web_name: []const u8,
+            team_code: u16,
+            element_type: u8,
+            /// stored as an integer, need to do / 10 to get real value
+            now_cost: u8,
+        };
+    };
+    pub fn call(allocator: Allocator) !std.json.Parsed(Response) {
+        const http = HTTP{
+            .url = "https://fantasy.premierleague.com",
+            .headers = "",
+            .path = "/api/bootstrap-static/",
+        };
+
+        return try http.get(allocator, Response, .{ .ignore_unknown_fields = true, .allocate = .alloc_always });
+    }
 };

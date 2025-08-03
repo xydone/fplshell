@@ -18,7 +18,7 @@ pub const Params = struct {
     it: std.mem.TokenIterator(u8, .sequence),
     player_table: *Table,
     filtered_players: *std.ArrayList(Player),
-    player_map: std.StringHashMapUnmanaged(Player),
+    player_map: std.AutoHashMapUnmanaged(u32, Player),
 };
 
 pub const Errors = error{ EmptyString, OOM };
@@ -40,7 +40,7 @@ fn call(params: Params) Errors!void {
     const input = std.ascii.allocLowerString(allocator, string) catch return error.OOM;
     var player_it = player_map.iterator();
     while (player_it.next()) |entry| {
-        const entry_name = std.ascii.allocLowerString(allocator, entry.key_ptr.*) catch return error.OOM;
+        const entry_name = std.ascii.allocLowerString(allocator, entry.value_ptr.*.name.?) catch return error.OOM;
 
         if (std.mem.containsAtLeast(u8, entry_name, 1, input)) {
             filtered_players.append(entry.value_ptr.*) catch return error.OOM;
