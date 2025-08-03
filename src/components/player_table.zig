@@ -16,19 +16,13 @@ const calcColWidth = Table.calcColWidth;
 
 const Player = @import("../lineup.zig").Player;
 const Lineup = @import("../lineup.zig").Lineup;
-
 const Colors = @import("../colors.zig");
 
-segment: Segment,
-context: *TableContext,
+const TableCommon = @import("table_common.zig");
+
+table: TableCommon,
 
 const Self = @This();
-
-// Colors
-const active_row: Color = Colors.light_blue;
-const selected_row: Color = Colors.black;
-const selected_table: Color = Colors.gray;
-const normal_table: Color = Colors.light_gray;
 
 pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
     const segment = Segment{
@@ -37,40 +31,25 @@ pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
     };
     const context = try allocator.create(TableContext);
     context.* = .{
-        .active_bg = active_row,
+        .active_bg = TableCommon.active_row,
         .active_fg = .{ .rgb = .{ 0, 0, 0 } },
-        .row_bg_1 = normal_table,
-        .row_bg_2 = normal_table,
-        .selected_bg = selected_row,
+        .row_bg_1 = TableCommon.normal_table,
+        .row_bg_2 = TableCommon.normal_table,
+        .selected_bg = TableCommon.selected_row,
         .header_names = .{ .custom = &.{ "Position", "Name", "Team", "Price" } },
         .col_indexes = .{ .by_idx = &.{ 0, 1, 2, 3 } },
     };
-    return Self{
+    const table: TableCommon = .{
         .segment = segment,
         .context = context,
     };
+    return Self{
+        .table = table,
+    };
 }
 
-pub fn makeActive(self: *Self) void {
-    self.context.active = true;
-    self.context.row_bg_1 = selected_table;
-    self.context.row_bg_2 = selected_table;
-}
-
-pub fn makeNormal(self: *Self) void {
-    self.context.active = false;
-    self.context.row_bg_1 = normal_table;
-    self.context.row_bg_2 = normal_table;
-}
-
-pub fn moveDown(self: *Self) void {
-    self.context.row +|= 1;
-}
-pub fn moveUp(self: *Self) void {
-    self.context.row -|= 1;
-}
-pub fn moveTo(self: *Self, to: u16) void {
-    self.context.row = to;
+pub fn deinit(self: Self, allocator: Allocator) void {
+    self.table.deinit(allocator);
 }
 
 pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, list: std.ArrayList(Player), is_lineup: bool) !void {
@@ -88,14 +67,9 @@ pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, l
         win.height,
     );
 
-    _ = aligned.printSegment(self.segment, .{ .wrap = .word });
+    _ = aligned.printSegment(self.table.segment, .{ .wrap = .word });
 
-    try drawInner(allocator, table_win, list, self.context, is_lineup);
-}
-
-pub fn deinit(self: Self, allocator: Allocator) void {
-    if (self.context.sel_rows) |rows| allocator.free(rows);
-    allocator.destroy(self.context);
+    try drawInner(allocator, table_win, list, self.table.context, is_lineup);
 }
 
 /// draw on the screen (fork of libvaxis's Table.Draw)

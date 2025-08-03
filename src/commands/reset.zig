@@ -1,5 +1,5 @@
 const std = @import("std");
-const Table = @import("../components/table.zig");
+const Table = @import("../components/player_table.zig");
 const Player = @import("../lineup.zig").Player;
 
 const COMMANDS = [_][]const u8{ "reset", "r", "res" };

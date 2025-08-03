@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const Table = @import("../components/table.zig");
+const Table = @import("../components/player_table.zig");
 const Player = @import("../lineup.zig").Player;
 
 const COMMANDS = [_][]const u8{ "search", "s" };
@@ -31,7 +31,7 @@ fn call(params: Params) Errors!void {
     const player_map = params.player_map;
 
     const string = it.rest();
-    player_table.moveTo(0);
+    player_table.table.moveTo(0);
 
     // if nothing has been entered, just continue early
     if (string.len == 0) return error.EmptyString;

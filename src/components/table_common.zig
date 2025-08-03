@@ -1,0 +1,58 @@
+const std = @import("std");
+const fmt = std.fmt;
+const heap = std.heap;
+const mem = std.mem;
+const meta = std.meta;
+const Allocator = std.mem.Allocator;
+
+const vaxis = @import("vaxis");
+const Window = vaxis.Window;
+const Segment = vaxis.Cell.Segment;
+const Table = vaxis.widgets.Table;
+const Color = vaxis.Cell.Color;
+
+pub const TableContext = Table.TableContext;
+const calcColWidth = Table.calcColWidth;
+
+const Player = @import("../lineup.zig").Player;
+const Lineup = @import("../lineup.zig").Lineup;
+
+const Colors = @import("../colors.zig");
+
+segment: Segment,
+context: *TableContext,
+
+const Self = @This();
+
+// Colors
+pub const active_row: Color = Colors.light_blue;
+pub const selected_row: Color = Colors.black;
+pub const selected_table: Color = Colors.gray;
+pub const normal_table: Color = Colors.light_gray;
+
+pub fn makeActive(self: *Self) void {
+    self.context.active = true;
+    self.context.row_bg_1 = selected_table;
+    self.context.row_bg_2 = selected_table;
+}
+
+pub fn makeNormal(self: *Self) void {
+    self.context.active = false;
+    self.context.row_bg_1 = normal_table;
+    self.context.row_bg_2 = normal_table;
+}
+
+pub fn moveDown(self: *Self) void {
+    self.context.row +|= 1;
+}
+pub fn moveUp(self: *Self) void {
+    self.context.row -|= 1;
+}
+pub fn moveTo(self: *Self, to: u16) void {
+    self.context.row = to;
+}
+
+pub fn deinit(self: Self, allocator: Allocator) void {
+    if (self.context.sel_rows) |rows| allocator.free(rows);
+    allocator.destroy(self.context);
+}

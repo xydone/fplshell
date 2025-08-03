@@ -6,9 +6,9 @@ const Config = @import("config.zig");
 const vaxis = @import("vaxis");
 const TextInput = vaxis.widgets.TextInput;
 const Key = vaxis.Key;
+const TableContext = vaxis.widgets.Table.TableContext;
 
-const Table = @import("components/table.zig");
-const TableContext = Table.TableContext;
+const PlayerTable = @import("components/player_table.zig");
 
 const Lineup = @import("lineup.zig").Lineup;
 
@@ -123,12 +123,12 @@ pub fn main() !void {
     var event_arena = std.heap.ArenaAllocator.init(allocator);
     defer event_arena.deinit();
 
-    var filtered = try Table.init(allocator, "Select a player");
-    defer filtered.deinit(allocator);
-    filtered.makeActive();
+    var filtered = try PlayerTable.init(allocator, "Select a player");
+    defer filtered.table.deinit(allocator);
+    filtered.table.makeActive();
 
-    var selected = try Table.init(allocator, "Selected players");
-    defer selected.deinit(allocator);
+    var selected = try PlayerTable.init(allocator, "Selected players");
+    defer selected.table.deinit(allocator);
 
     var active_menu: Menu = .search_table;
 
@@ -145,16 +145,16 @@ pub fn main() !void {
                     break;
                 }
                 row_navigation: {
-                    var table: *Table = switch (active_menu) {
+                    var active_table: *PlayerTable = switch (active_menu) {
                         .search_table => &filtered,
                         .selected => &selected,
                         else => break :row_navigation,
                     };
 
                     if (key.matches(Key.up, .{})) {
-                        table.moveUp();
+                        active_table.table.moveUp();
                     } else if (key.matches(Key.down, .{})) {
-                        table.moveDown();
+                        active_table.table.moveDown();
                     }
                 }
 
@@ -232,17 +232,19 @@ pub fn main() !void {
                             try cmd_input.update(.{ .key_press = key });
                         }
                     },
-                    .search_table => {
+                    .search_table => search_table: {
+                        const currently_selected_player = filtered_players.items[filtered.table.context.row];
                         if (key.matchExact(Key.enter, .{})) {
-                            lineup.appendAny(filtered_players.items[filtered.context.row]) catch {
+                            lineup.appendAny(currently_selected_player) catch {
                                 //TODO: signify selection full somehow?
+                                break :search_table;
                             };
                         } else if (key.matches(Key.right, .{})) {
                             active_menu = .selected;
-                            selected.makeActive();
-                            filtered.makeNormal();
+                            selected.table.makeActive();
+                            filtered.table.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
-                            lineup.appendAny(filtered_players.items[filtered.context.row]) catch {
+                            lineup.appendAny(currently_selected_player) catch {
                                 //TODO: signify selection full somehow?
                             };
                         }
@@ -250,25 +252,25 @@ pub fn main() !void {
                     .selected => selected: {
                         if (key.matches(Key.left, .{})) {
                             active_menu = .search_table;
-                            filtered.makeActive();
-                            selected.makeNormal();
+                            filtered.table.makeActive();
+                            selected.table.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
-                            lineup.remove(selected.context.row);
+                            lineup.remove(selected.table.context.row);
                         } else if (key.matchExact(Key.space, .{})) {
-                            const rows = selected.context.sel_rows orelse {
-                                selected.context.sel_rows = try allocator.alloc(u16, 1);
-                                selected.context.sel_rows.?[0] = selected.context.row;
+                            const rows = selected.table.context.sel_rows orelse {
+                                selected.table.context.sel_rows = try allocator.alloc(u16, 1);
+                                selected.table.context.sel_rows.?[0] = selected.table.context.row;
                                 break :selected;
                             };
                             defer {
-                                allocator.free(selected.context.sel_rows.?);
-                                selected.context.sel_rows = null;
+                                allocator.free(selected.table.context.sel_rows.?);
+                                selected.table.context.sel_rows = null;
                             }
                             // if we click an already selected one, unselect
-                            if (selected.context.row == rows[0]) break :selected;
+                            if (selected.table.context.row == rows[0]) break :selected;
 
                             // if we are still here, swap them
-                            std.mem.swap(?Player, &lineup.players[selected.context.row], &lineup.players[rows[0]]);
+                            std.mem.swap(?Player, &lineup.players[selected.table.context.row], &lineup.players[rows[0]]);
                         }
                     },
                 }
@@ -282,12 +284,16 @@ pub fn main() !void {
 
         win.clear();
 
+        const ROWS_PER_TABLE = 15;
+        // running total of current offsets
+        var x_off: i17 = 1;
+        const y_off: i17 = 2;
         // left table
         const filtered_win = win.child(.{
-            .x_off = 1,
-            .y_off = 2,
-            .width = win.width / 2,
-            .height = win.height / 2,
+            .x_off = x_off,
+            .y_off = y_off,
+            .width = win.width / 3,
+            .height = ROWS_PER_TABLE + 2,
         });
 
         try filtered.draw(
@@ -298,12 +304,13 @@ pub fn main() !void {
             false,
         );
 
-        // right table
+        // lineup table
+        x_off += filtered_win.width + 2;
         const selected_win = win.child(.{
-            .x_off = filtered_win.width + filtered_win.x_off + 2,
-            .y_off = filtered_win.y_off,
-            .width = win.width / 2,
-            .height = win.height,
+            .x_off = x_off,
+            .y_off = y_off,
+            .width = win.width / 3,
+            .height = ROWS_PER_TABLE + 2,
         });
         var buf: [15]Player = undefined;
         lineup.toString(&buf);

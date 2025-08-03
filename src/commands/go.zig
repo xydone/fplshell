@@ -1,5 +1,5 @@
 const std = @import("std");
-const Table = @import("../components/table.zig");
+const Table = @import("../components/player_table.zig");
 
 const COMMANDS = [_][]const u8{ "go", "g" };
 
@@ -20,7 +20,7 @@ pub const Errors = error{ TokenNaN, EmptyToken };
 fn call(params: Params) Errors!void {
     const line_token = params.it.next() orelse return error.EmptyToken;
     const line = std.fmt.parseInt(u16, line_token, 10) catch return error.TokenNaN;
-    params.players_table.moveTo(line);
+    params.players_table.table.moveTo(line);
 }
 
 pub fn handle(cmd: []const u8, params: Params) Errors!bool {

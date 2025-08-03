@@ -1,5 +1,5 @@
 const std = @import("std");
-const Table = @import("../components/table.zig");
+const Table = @import("../components/player_table.zig");
 
 const GetStatic = @import("../fpl.zig").GetStatic;
 const GetFixtures = @import("../fpl.zig").GetFixtures;
