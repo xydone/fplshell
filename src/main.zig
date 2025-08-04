@@ -326,7 +326,7 @@ pub fn main() !void {
                             selected.table.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
                             lineup.remove(selected.table.context.row);
-                            team_lineup.remove(event_alloc, selected.table.context.row);
+                            team_lineup.remove(selected.table.context.row);
                         } else if (key.matchExact(Key.space, .{})) {
                             const rows = selected.table.context.sel_rows orelse {
                                 selected.table.context.sel_rows = try allocator.alloc(u16, 1);

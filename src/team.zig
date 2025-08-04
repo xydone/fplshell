@@ -81,10 +81,7 @@ pub const TeamLineup = struct {
         return error.SelectionFull;
     }
 
-    pub fn remove(self: *TeamLineup, allocator: Allocator, index: u16) void {
-        if (self.teams[index]) |team| {
-            team.deinit(allocator);
-        }
+    pub fn remove(self: *TeamLineup, index: u16) void {
         self.teams[index] = null;
     }
 };
