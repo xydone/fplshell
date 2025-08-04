@@ -1,0 +1,90 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+
+const Team = @This();
+
+first_gw: ?[]const u8,
+second_gw: ?[]const u8,
+third_gw: ?[]const u8,
+opponents: ?[]Match,
+name: ?[]const u8,
+
+pub fn deinit(self: Team, allocator: Allocator) void {
+    if (self.first_gw) |gw| allocator.free(gw);
+    if (self.second_gw) |gw| allocator.free(gw);
+    if (self.third_gw) |gw| allocator.free(gw);
+}
+pub const Match = struct {
+    opponent_name: []const u8,
+    opponent_short: []const u8,
+    venue: enum { home, away },
+    opponent_id: u32,
+    pub fn toString(self: Match, allocator: Allocator) ![]u8 {
+        return try std.fmt.allocPrint(allocator, "{s} ({s})", .{ self.opponent_short, switch (self.venue) {
+            .home => "H",
+            .away => "A",
+        } });
+    }
+};
+
+const empty = Team{
+    .name = null,
+    .opponents = null,
+    .first_gw = null,
+    .second_gw = null,
+    .third_gw = null,
+};
+
+pub const TeamLineup = struct {
+    teams: [15]?Team,
+    pub fn init() TeamLineup {
+        return TeamLineup{
+            .teams = [_]?Team{null} ** 15,
+        };
+    }
+    pub fn toString(self: TeamLineup, buf: *[15]Team) void {
+        for (self.teams, 0..) |team, i| {
+            if (team) |t| {
+                buf[i] = t;
+            } else buf[i] = Team.empty;
+        }
+    }
+
+    pub const AppendErrors = error{SelectionFull};
+    pub fn appendAny(self: *TeamLineup, team: Team) AppendErrors!void {
+        self.appendStarter(team) catch {
+            // if we cannot append as a starter, append as bench
+            // return SelectionFull if we cannot append as bench either
+            try self.appendBench(team);
+        };
+    }
+
+    /// Does not check if lineup is valid.
+    pub fn appendStarter(self: *TeamLineup, team: Team) AppendErrors!void {
+        for (0..11) |i| {
+            if (self.teams[i] == null) {
+                self.teams[i] = team;
+                return;
+            }
+        }
+        return error.SelectionFull;
+    }
+
+    /// Does not check if lineup is valid.
+    pub fn appendBench(self: *TeamLineup, team: Team) AppendErrors!void {
+        for (11..15) |i| {
+            if (self.teams[i] == null) {
+                self.teams[i] = team;
+                return;
+            }
+        }
+        return error.SelectionFull;
+    }
+
+    pub fn remove(self: *TeamLineup, allocator: Allocator, index: u16) void {
+        if (self.teams[index]) |team| {
+            team.deinit(allocator);
+        }
+        self.teams[index] = null;
+    }
+};

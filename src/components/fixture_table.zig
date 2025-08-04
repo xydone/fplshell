@@ -5,71 +5,79 @@ const mem = std.mem;
 const meta = std.meta;
 const Allocator = std.mem.Allocator;
 
+const TableCommon = @import("table_common.zig");
 const vaxis = @import("vaxis");
 const Window = vaxis.Window;
 const Segment = vaxis.Cell.Segment;
-const Table = vaxis.widgets.Table;
+const VaxisTable = vaxis.widgets.Table;
 const Color = vaxis.Cell.Color;
 
-pub const TableContext = Table.TableContext;
-const calcColWidth = Table.calcColWidth;
+const Team = @import("../team.zig");
 
-const Player = @import("../lineup.zig").Player;
-const Lineup = @import("../lineup.zig").Lineup;
+pub const TableContext = VaxisTable.TableContext;
+
+const calcColWidth = VaxisTable.calcColWidth;
+
 const Colors = @import("../colors.zig");
-
-const TableCommon = @import("table_common.zig");
+const active_row = TableCommon.active_row;
+const selected_row = TableCommon.selected_row;
+const selected_table = TableCommon.selected_table;
+const normal_table = TableCommon.normal_table;
 
 table: TableCommon,
+gw_texts: *std.ArrayList([]u8),
+header_names: [][]u8,
 
 const Self = @This();
 
-pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
-    const segment = Segment{
-        .text = segment_text,
-        .style = .{},
-    };
+pub fn init(allocator: Allocator, first_gw: u8) !Self {
     const context = try allocator.create(TableContext);
+
+    const gw_texts = try allocator.create(std.ArrayList([]u8));
+    gw_texts.* = .init(allocator);
+    for (first_gw..first_gw + 3) |i| {
+        try gw_texts.append(try std.fmt.allocPrint(allocator, "GW{}", .{i}));
+    }
+    const header_names = try allocator.alloc([]u8, 3);
+    header_names[0] = gw_texts.items[0];
+    header_names[1] = gw_texts.items[1];
+    header_names[2] = gw_texts.items[2];
+
     context.* = .{
-        .active_bg = TableCommon.active_row,
+        .active_bg = active_row,
         .active_fg = .{ .rgb = .{ 0, 0, 0 } },
-        .row_bg_1 = TableCommon.normal_table,
-        .row_bg_2 = TableCommon.normal_table,
-        .selected_bg = TableCommon.selected_row,
-        .header_names = .{ .custom = &.{ "Position", "Name", "Team", "Price" } },
-        .col_indexes = .{ .by_idx = &.{ 0, 1, 2, 3 } },
+        .row_bg_1 = normal_table,
+        .row_bg_2 = normal_table,
+        .selected_bg = selected_row,
+        .header_names = .{ .custom = header_names },
+        .col_indexes = .{ .by_idx = &.{ 0, 1, 2 } },
     };
-    const table: TableCommon = .{
-        .segment = segment,
+    const table = TableCommon{
+        .segment = null,
         .context = context,
     };
+
     return Self{
         .table = table,
+        .gw_texts = gw_texts,
+        .header_names = header_names,
     };
 }
 
 pub fn deinit(self: Self, allocator: Allocator) void {
     self.table.deinit(allocator);
+
+    allocator.free(self.header_names);
+
+    for (self.gw_texts.items) |gw| {
+        allocator.free(gw);
+    }
+    self.gw_texts.deinit();
+
+    allocator.destroy(self.gw_texts);
 }
-
-pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, list: std.ArrayList(Player), is_lineup: bool) !void {
-    // prepare segment
-    const bar = win.child(.{
-        .x_off = table_win.x_off,
-        .y_off = table_win.y_off - 1,
-        .width = table_win.width,
-        .height = table_win.height,
-    });
-
-    const aligned = vaxis.widgets.alignment.center(
-        bar,
-        win.width,
-        win.height,
-    );
-
-    _ = aligned.printSegment(self.table.segment.?, .{ .wrap = .word });
-
-    try drawInner(allocator, table_win, list, self.table.context, is_lineup);
+pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.ArrayList(Team)) !void {
+    try drawInner(allocator, table_win, fixtures, self.table.context);
 }
 
 /// draw on the screen (fork of libvaxis's Table.Draw)
@@ -77,12 +85,10 @@ fn drawInner(
     allocator: ?mem.Allocator,
     /// The parent Window to draw to.
     win: vaxis.Window,
-    data_list: std.ArrayList(Player),
+    team_list: std.ArrayList(Team),
     table_ctx: *TableContext,
-    /// Should this table be treated as a lineup table?
-    is_lineup: bool,
 ) !void {
-    const fields = meta.fields(Player);
+    const fields = meta.fields(Team);
     const field_indexes = switch (table_ctx.col_indexes) {
         .all => comptime allIdx: {
             var indexes_buf: [fields.len]usize = undefined;
@@ -162,18 +168,18 @@ fn drawInner(
     // Rows
     if (table_ctx.active_content_fn == null) table_ctx.active_y_off = 0;
     const max_items: u16 =
-        if (data_list.items.len > table_win.height -| 1) table_win.height -| 1 else @intCast(data_list.items.len);
+        if (team_list.items.len > table_win.height -| 1) table_win.height -| 1 else @intCast(team_list.items.len);
     var end = table_ctx.start + max_items;
     if (table_ctx.row + table_ctx.active_y_off >= win.height -| 2)
         end -|= table_ctx.active_y_off;
-    if (end > data_list.items.len) end = @intCast(data_list.items.len);
+    if (end > team_list.items.len) end = @intCast(team_list.items.len);
     table_ctx.start = tableStart: {
         if (table_ctx.row == 0)
             break :tableStart 0;
         if (table_ctx.row < table_ctx.start)
             break :tableStart table_ctx.start - (table_ctx.start - table_ctx.row);
-        if (table_ctx.row >= data_list.items.len - 1)
-            table_ctx.row = @intCast(data_list.items.len - 1);
+        if (table_ctx.row >= team_list.items.len - 1)
+            table_ctx.row = @intCast(team_list.items.len - 1);
         if (table_ctx.row >= end)
             break :tableStart table_ctx.start + (table_ctx.row - end + 1);
         break :tableStart table_ctx.start;
@@ -181,13 +187,13 @@ fn drawInner(
     end = table_ctx.start + max_items;
     if (table_ctx.row + table_ctx.active_y_off >= win.height -| 2)
         end -|= table_ctx.active_y_off;
-    if (end > data_list.items.len) end = @intCast(data_list.items.len);
+    if (end > team_list.items.len) end = @intCast(team_list.items.len);
     table_ctx.start = @min(table_ctx.start, end);
     table_ctx.active_y_off = 0;
-    for (data_list.items[table_ctx.start..end], 0..) |player, row| {
+    for (team_list.items[table_ctx.start..end], 0..) |fix, row| {
         const row_fg, const row_bg = rowColors: {
-            const fg = player.foreground_color orelse .default;
-            const bg = player.background_color orelse table_ctx.row_bg_1;
+            const fg = .default;
+            const bg = table_ctx.row_bg_1;
 
             if (table_ctx.active and table_ctx.start + row == table_ctx.row)
                 break :rowColors .{ table_ctx.active_fg, Colors.brighten(bg, 50) };
@@ -199,34 +205,19 @@ fn drawInner(
         };
 
         col_start = 0;
-        const item_fields = meta.fields(Player);
+        const item_fields = meta.fields(Team);
         var col_idx: usize = 0;
 
         const row_y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
         var row_win = table_win.child(.{
             .x_off = 0,
-            .y_off = if (row > 10 and is_lineup) row_y_off + 1 else row_y_off,
+            // add an empty space where the "Bench" would be on the lineup
+            .y_off = if (row > 10) row_y_off + 1 else row_y_off,
             .width = table_win.width,
             .height = 1,
         });
         if (table_ctx.start + row == table_ctx.row) {
             table_ctx.active_y_off = if (table_ctx.active_content_fn) |content| try content(&row_win, table_ctx.active_ctx) else 0;
-        }
-
-        // draw a bench line
-        if (row == 10 and is_lineup) {
-            const bench_win = table_win.child(.{
-                .x_off = 1,
-                .y_off = row_y_off + 1, // only increasing by 1 on the line before the bench to make sure this does not offset the entire table
-                .width = table_win.width,
-                .height = 1,
-            });
-
-            const segment = Segment{
-                .text = "Bench",
-                .style = .{},
-            };
-            _ = bench_win.printSegment(segment, .{ .wrap = .word });
         }
         for (field_indexes) |f_idx| {
             inline for (item_fields[0..], 0..) |item_field, item_idx| contFields: {
@@ -244,7 +235,7 @@ fn drawInner(
                     table_win,
                 );
                 defer col_start += col_width;
-                const item = @field(player, item_field.name);
+                const item = @field(fix, item_field.name);
                 const ItemT = @TypeOf(item);
                 const item_win = row_win.child(.{
                     .x_off = col_start,
@@ -267,19 +258,19 @@ fn drawInner(
                                 switch (@typeInfo(ItemT).optional.child) {
                                     []const u8 => break :nonStr opt_item,
                                     [][]const u8, []const []const u8 => {
-                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{s}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
+                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{s}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Team)});
                                     },
                                     // janky!
                                     f16, f32, f64 => {
-                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{d:.1}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
+                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{d:.1}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Team)});
                                     },
                                     else => {
-                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
+                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Team)});
                                     },
                                 }
                             },
                             else => {
-                                break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
+                                break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Team)});
                             },
                         }
                     },

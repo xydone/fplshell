@@ -19,7 +19,7 @@ const Lineup = @import("../lineup.zig").Lineup;
 
 const Colors = @import("../colors.zig");
 
-segment: Segment,
+segment: ?Segment,
 context: *TableContext,
 
 const Self = @This();

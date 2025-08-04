@@ -92,13 +92,14 @@ pub const GetStatic = struct {
         elements: []Element,
 
         const Team = struct {
-            code: u32,
+            id: u32,
             name: []const u8,
+            short_name: []const u8,
         };
         const Element = struct {
             id: u32,
             web_name: []const u8,
-            team_code: u16,
+            team: u16,
             element_type: u8,
             /// stored as an integer, need to do / 10 to get real value
             now_cost: u8,

@@ -9,8 +9,12 @@ const Key = vaxis.Key;
 const TableContext = vaxis.widgets.Table.TableContext;
 
 const PlayerTable = @import("components/player_table.zig");
+const FixtureTable = @import("components/fixture_table.zig");
 
 const Lineup = @import("lineup.zig").Lineup;
+
+const Team = @import("team.zig");
+const Match = Team.Match;
 
 const Colors = @import("colors.zig");
 const Teams = @import("fpl.zig").Teams;
@@ -49,26 +53,87 @@ pub fn main() !void {
     var player_map = std.AutoHashMapUnmanaged(u32, Player).empty;
     defer player_map.deinit(allocator);
 
-    var team_map = std.AutoHashMapUnmanaged(u32, []const u8).empty;
-    defer team_map.deinit(allocator);
+    const TeamNames = struct { full: []const u8, short: []const u8 };
+    var team_name_map = std.AutoHashMapUnmanaged(u32, TeamNames).empty;
+    defer team_name_map.deinit(allocator);
 
     for (static_data.value.teams) |team| {
-        try team_map.put(allocator, team.code, team.name);
+        try team_name_map.put(allocator, team.id, .{ .full = team.name, .short = team.short_name });
     }
 
     var all_players = std.ArrayList(Player).init(allocator);
     defer all_players.deinit();
 
+    // prepare team data
+    var match_map = std.AutoHashMapUnmanaged(u32, std.ArrayList(Match)).empty;
+
+    defer {
+        var it = match_map.iterator();
+        while (it.next()) |entry| {
+            entry.value_ptr.*.deinit();
+        }
+        defer match_map.deinit(allocator);
+    }
+
+    for (fixtures_data.value) |fixture| {
+        var is_home = true;
+        for ([_]u32{ fixture.team_h, fixture.team_a }, [_]u32{ fixture.team_a, fixture.team_h }) |team_id, opponent| {
+            // invert is_home for the second cycle. goes back to true for the first
+            defer is_home = !is_home;
+            const gop = try match_map.getOrPut(allocator, team_id);
+            const names = team_name_map.get(opponent) orelse @panic("Team name not found!");
+            const temp = Match{
+                .opponent_id = opponent,
+                .venue = if (is_home) .home else .away,
+                .opponent_name = names.full,
+                .opponent_short = names.short,
+            };
+
+            if (gop.found_existing) {
+                try gop.value_ptr.*.append(temp);
+            } else {
+                var list = std.ArrayList(Match).init(allocator);
+                try list.append(temp);
+                gop.key_ptr.* = team_id;
+                gop.value_ptr.* = list;
+            }
+        }
+    }
+
+    var team_map: std.AutoHashMapUnmanaged(u32, Team) = .empty;
+    defer {
+        defer team_map.deinit(allocator);
+        var it = team_map.valueIterator();
+        while (it.next()) |team| {
+            team.deinit(allocator);
+        }
+    }
+
+    var schedule_iterator = match_map.iterator();
+    while (schedule_iterator.next()) |schedule| {
+        const match = match_map.get(schedule.key_ptr.*) orelse @panic("Schedule key missing from match map");
+        const names = team_name_map.get(schedule.key_ptr.*) orelse @panic("Schedule key missing from name map");
+
+        const team = Team{
+            .name = names.full,
+            .first_gw = try match.items[0].toString(allocator),
+            .second_gw = try match.items[1].toString(allocator),
+            .third_gw = try match.items[2].toString(allocator),
+            .opponents = match.items,
+        };
+        try team_map.put(allocator, schedule.key_ptr.*, team);
+    }
+
     for (static_data.value.elements) |element| {
-        const team_name = team_map.get(element.team_code) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team_code});
-        const bg = Teams.fromString(team_name).color();
+        const names = team_name_map.get(element.team) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team});
+        const bg = Teams.fromString(names.full).color();
         const player = Player{
             .name = element.web_name,
             .position = Player.Position.fromElementType(element.element_type),
             .position_name = Player.fromElementType(element.element_type),
             .price = @as(f32, @floatFromInt(element.now_cost)) / 10,
-            .team_name = team_name,
-            .team_id = element.team_code,
+            .team_name = names.full,
+            .team_id = element.team,
             .background_color = bg,
             .foreground_color = Colors.getTextColor(bg),
         };
@@ -79,7 +144,7 @@ pub fn main() !void {
 
     // read team data from config
     var lineup: Lineup = .init();
-
+    var team_lineup: Team.TeamLineup = .init();
     readTeam: {
         // if team.json doesn't exist, leave lineup empty
         const team_data = Config.getTeam(allocator) catch break :readTeam;
@@ -87,7 +152,11 @@ pub fn main() !void {
 
         for (team_data.value.picks) |pick| {
             const player = player_map.get(pick.element);
-            if (player) |pl| try lineup.appendAny(pl);
+            if (player) |pl| {
+                try lineup.appendAny(pl);
+                const team = team_map.get(pl.team_id.?) orelse @panic("Team not found in team map!");
+                try team_lineup.appendAny(team);
+            }
         }
     }
 
@@ -124,11 +193,14 @@ pub fn main() !void {
     defer event_arena.deinit();
 
     var filtered = try PlayerTable.init(allocator, "Select a player");
-    defer filtered.table.deinit(allocator);
+    defer filtered.deinit(allocator);
     filtered.table.makeActive();
 
     var selected = try PlayerTable.init(allocator, "Selected players");
-    defer selected.table.deinit(allocator);
+    defer selected.deinit(allocator);
+
+    var fixture_table = try FixtureTable.init(allocator, 1);
+    defer fixture_table.deinit(allocator);
 
     var active_menu: Menu = .search_table;
 
@@ -239,14 +311,12 @@ pub fn main() !void {
                                 //TODO: signify selection full somehow?
                                 break :search_table;
                             };
+                            const team = team_map.get(currently_selected_player.team_id.?) orelse @panic("Team not found in team map!");
+                            try team_lineup.appendAny(team);
                         } else if (key.matches(Key.right, .{})) {
                             active_menu = .selected;
                             selected.table.makeActive();
                             filtered.table.makeNormal();
-                        } else if (key.matchExact(Key.enter, .{})) {
-                            lineup.appendAny(currently_selected_player) catch {
-                                //TODO: signify selection full somehow?
-                            };
                         }
                     },
                     .selected => selected: {
@@ -256,6 +326,7 @@ pub fn main() !void {
                             selected.table.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
                             lineup.remove(selected.table.context.row);
+                            team_lineup.remove(event_alloc, selected.table.context.row);
                         } else if (key.matchExact(Key.space, .{})) {
                             const rows = selected.table.context.sel_rows orelse {
                                 selected.table.context.sel_rows = try allocator.alloc(u16, 1);
@@ -271,6 +342,7 @@ pub fn main() !void {
 
                             // if we are still here, swap them
                             std.mem.swap(?Player, &lineup.players[selected.table.context.row], &lineup.players[rows[0]]);
+                            std.mem.swap(?Team, &team_lineup.teams[selected.table.context.row], &team_lineup.teams[rows[0]]);
                         }
                     },
                 }
@@ -322,6 +394,24 @@ pub fn main() !void {
             selected_win,
             players,
             true,
+        );
+
+        // team table
+        x_off += selected_win.width;
+        const team_win = win.child(.{
+            .x_off = x_off,
+            .y_off = y_off,
+            .width = win.width / 3,
+            .height = ROWS_PER_TABLE + 2,
+        });
+        var team_buf: [15]Team = undefined;
+        team_lineup.toString(&team_buf);
+        const fixtures = std.ArrayList(Team).fromOwnedSlice(allocator, &team_buf);
+
+        try fixture_table.draw(
+            event_alloc,
+            team_win,
+            fixtures,
         );
 
         // bottom bar
