@@ -29,6 +29,7 @@ const Position = @import("commands/position.zig");
 const Sort = @import("commands/sort.zig");
 
 const Menu = enum {
+    gameweek_selector,
     search_table,
     selected,
     cmd,
@@ -197,6 +198,8 @@ pub fn main() !void {
     defer fixture_table.deinit(allocator);
 
     var active_menu: Menu = .search_table;
+    // Used for smooth transitioning in and out of the gameweek selector menu
+    var previous_menu: Menu = active_menu;
 
     while (true) {
         defer _ = event_arena.reset(.retain_capacity);
@@ -209,6 +212,17 @@ pub fn main() !void {
             .key_press => |key| {
                 if (key.matches('c', .{ .ctrl = true })) {
                     break;
+                }
+                if (key.matchExact(Key.tab, .{})) {
+                    switch (active_menu) {
+                        .gameweek_selector => {
+                            active_menu = previous_menu;
+                        },
+                        else => {
+                            previous_menu = active_menu;
+                            active_menu = .gameweek_selector;
+                        },
+                    }
                 }
                 row_navigation: {
                     var active_table: *PlayerTable = switch (active_menu) {
@@ -230,6 +244,17 @@ pub fn main() !void {
                 }
 
                 switch (active_menu) {
+                    .gameweek_selector => {
+                        if (key.matchExact(Key.left, .{})) {
+                            const start = fixture_table.start_index - 1;
+                            const end = fixture_table.end_index - 1;
+                            fixture_table.setRange(allocator, start, end);
+                        } else if (key.matches(Key.right, .{})) {
+                            const start = fixture_table.start_index + 1;
+                            const end = fixture_table.end_index + 1;
+                            fixture_table.setRange(allocator, start, end);
+                        }
+                    },
                     .cmd => cmd: {
                         if (key.matchExact(vaxis.Key.enter, .{})) {
                             //default to making the active menu, after enter is clicked, the search table

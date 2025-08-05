@@ -25,7 +25,6 @@ const selected_table = TableCommon.selected_table;
 const normal_table = TableCommon.normal_table;
 
 table: TableCommon,
-gw_texts: *std.ArrayList([]u8),
 header_names: [][]u8,
 start_index: u8,
 end_index: u8,
@@ -36,12 +35,10 @@ pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
     const gameweek_count = last_gw - first_gw + 1;
     const context = try allocator.create(TableContext);
 
-    const gw_texts = try allocator.create(std.ArrayList([]u8));
-    gw_texts.* = .init(allocator);
     const header_names = try allocator.alloc([]u8, gameweek_count);
-    for (first_gw..last_gw + 1) |i| {
-        try gw_texts.append(try std.fmt.allocPrint(allocator, "GW{}", .{i}));
-        header_names[i - 1] = gw_texts.items[i - 1];
+
+    for (0..gameweek_count) |i| {
+        header_names[i] = try std.fmt.allocPrint(allocator, "GW{}", .{i + 1});
     }
 
     context.* = .{
@@ -59,30 +56,43 @@ pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
 
     return Self{
         .table = table,
-        .gw_texts = gw_texts,
         .header_names = header_names,
         .start_index = first_gw,
         .end_index = last_gw,
     };
 }
 
+fn updateHeaders(self: *Self, allocator: Allocator, range_start: u8, range_end: u8) !void {
+    const range = range_end - range_start + 1;
+    for (0..range) |i| {
+        allocator.free(self.header_names[i]);
+        self.header_names[i] = try std.fmt.allocPrint(allocator, "GW{}", .{range_start + i});
+    }
+}
+
 /// Changes the fixture gameweek range, if there's a null start/end value, it remains the same.
-pub fn setRange(self: *Self, start_index: ?u8, end_index: ?u8) void {
-    if (start_index) |idx| self.start_index = idx;
-    if (end_index) |idx| self.end_index = idx;
+pub fn setRange(self: *Self, allocator: Allocator, start_index: ?u8, end_index: ?u8) void {
+    const LOWER_BOUND = 1;
+    const UPPER_BOUND = 38;
+    const range = (end_index orelse self.end_index) - (start_index orelse self.start_index);
+    if (start_index) |idx| {
+        if (idx < LOWER_BOUND or idx > UPPER_BOUND - range) return;
+        self.start_index = idx;
+    }
+    if (end_index) |idx| {
+        self.end_index = idx;
+    }
+
+    self.updateHeaders(allocator, self.start_index, self.end_index) catch @panic("OOM");
 }
 
 pub fn deinit(self: Self, allocator: Allocator) void {
     self.table.deinit(allocator);
 
-    allocator.free(self.header_names);
-
-    for (self.gw_texts.items) |gw| {
-        allocator.free(gw);
+    for (self.header_names) |header| {
+        allocator.free(header);
     }
-    self.gw_texts.deinit();
-
-    allocator.destroy(self.gw_texts);
+    allocator.free(self.header_names);
 }
 pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.ArrayList(Team)) !void {
     try drawInner(
