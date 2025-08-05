@@ -253,37 +253,7 @@ fn drawInner(
                     .height = 1,
                     .border = .{ .where = if (table_ctx.col_borders and col_idx > 0) .left else .none },
                 });
-                const item_txt = switch (ItemT) {
-                    []const u8 => item,
-                    [][]const u8, []const []const u8 => strSlice: {
-                        if (allocator) |_alloc| break :strSlice try fmt.allocPrint(_alloc, "{s}", .{item});
-                        break :strSlice item;
-                    },
-                    else => nonStr: {
-                        switch (@typeInfo(ItemT)) {
-                            .@"enum" => break :nonStr @tagName(item),
-                            .optional => {
-                                const opt_item = item orelse break :nonStr "-";
-                                switch (@typeInfo(ItemT).optional.child) {
-                                    []const u8 => break :nonStr opt_item,
-                                    [][]const u8, []const []const u8 => {
-                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{s}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
-                                    },
-                                    // janky!
-                                    f16, f32, f64 => {
-                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{d:.1}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
-                                    },
-                                    else => {
-                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
-                                    },
-                                }
-                            },
-                            else => {
-                                break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Player)});
-                            },
-                        }
-                    },
-                };
+                const item_txt = try TableCommon.getCellString(allocator.?, ItemT, item);
                 item_win.fill(.{ .style = .{ .bg = row_bg } });
                 const item_align_win = itemAlignWin: {
                     const col_align = switch (table_ctx.col_align) {

@@ -27,21 +27,22 @@ const normal_table = TableCommon.normal_table;
 table: TableCommon,
 gw_texts: *std.ArrayList([]u8),
 header_names: [][]u8,
+start_index: u8,
+end_index: u8,
 
 const Self = @This();
 
-pub fn init(allocator: Allocator, first_gw: u8) !Self {
+pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
+    const gameweek_count = last_gw - first_gw + 1;
     const context = try allocator.create(TableContext);
 
     const gw_texts = try allocator.create(std.ArrayList([]u8));
     gw_texts.* = .init(allocator);
-    for (first_gw..first_gw + 3) |i| {
+    const header_names = try allocator.alloc([]u8, gameweek_count);
+    for (first_gw..last_gw + 1) |i| {
         try gw_texts.append(try std.fmt.allocPrint(allocator, "GW{}", .{i}));
+        header_names[i - 1] = gw_texts.items[i - 1];
     }
-    const header_names = try allocator.alloc([]u8, 3);
-    header_names[0] = gw_texts.items[0];
-    header_names[1] = gw_texts.items[1];
-    header_names[2] = gw_texts.items[2];
 
     context.* = .{
         .active_bg = active_row,
@@ -50,7 +51,6 @@ pub fn init(allocator: Allocator, first_gw: u8) !Self {
         .row_bg_2 = normal_table,
         .selected_bg = selected_row,
         .header_names = .{ .custom = header_names },
-        .col_indexes = .{ .by_idx = &.{ 0, 1, 2 } },
     };
     const table = TableCommon{
         .segment = null,
@@ -61,7 +61,15 @@ pub fn init(allocator: Allocator, first_gw: u8) !Self {
         .table = table,
         .gw_texts = gw_texts,
         .header_names = header_names,
+        .start_index = first_gw,
+        .end_index = last_gw,
     };
+}
+
+/// Changes the fixture gameweek range, if there's a null start/end value, it remains the same.
+pub fn setRange(self: *Self, start_index: ?u8, end_index: ?u8) void {
+    if (start_index) |idx| self.start_index = idx;
+    if (end_index) |idx| self.end_index = idx;
 }
 
 pub fn deinit(self: Self, allocator: Allocator) void {
@@ -77,7 +85,14 @@ pub fn deinit(self: Self, allocator: Allocator) void {
     allocator.destroy(self.gw_texts);
 }
 pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.ArrayList(Team)) !void {
-    try drawInner(allocator, table_win, fixtures, self.table.context);
+    try drawInner(
+        allocator,
+        table_win,
+        fixtures,
+        self.table.context,
+        self.start_index,
+        self.end_index,
+    );
 }
 
 /// draw on the screen (fork of libvaxis's Table.Draw)
@@ -87,16 +102,15 @@ fn drawInner(
     win: vaxis.Window,
     team_list: std.ArrayList(Team),
     table_ctx: *TableContext,
+    start_index: u8,
+    end_index: u8,
 ) !void {
     const fields = meta.fields(Team);
-    const field_indexes = switch (table_ctx.col_indexes) {
-        .all => comptime allIdx: {
-            var indexes_buf: [fields.len]usize = undefined;
-            for (0..fields.len) |idx| indexes_buf[idx] = idx;
-            const indexes = indexes_buf;
-            break :allIdx indexes[0..];
-        },
-        .by_idx => |by_idx| by_idx,
+    const field_indexes = comptime allIdx: {
+        var indexes_buf: [fields.len]usize = undefined;
+        for (0..fields.len) |idx| indexes_buf[idx] = idx;
+        const indexes = indexes_buf;
+        break :allIdx indexes[0..];
     };
 
     // Headers for the Table
@@ -205,7 +219,6 @@ fn drawInner(
         };
 
         col_start = 0;
-        const item_fields = meta.fields(Team);
         var col_idx: usize = 0;
 
         const row_y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
@@ -219,24 +232,12 @@ fn drawInner(
         if (table_ctx.start + row == table_ctx.row) {
             table_ctx.active_y_off = if (table_ctx.active_content_fn) |content| try content(&row_win, table_ctx.active_ctx) else 0;
         }
-        for (field_indexes) |f_idx| {
-            inline for (item_fields[0..], 0..) |item_field, item_idx| contFields: {
-                switch (table_ctx.col_indexes) {
-                    .all => {},
-                    .by_idx => {
-                        if (item_idx != f_idx) break :contFields;
-                    },
-                }
+        if (fix.opponents) |opponents| {
+            for (opponents[start_index - 1 .. end_index], 0..) |opponent, item_idx| {
                 defer col_idx += 1;
-                const col_width = try calcColWidth(
-                    item_idx,
-                    headers,
-                    table_ctx.col_width,
-                    table_win,
-                );
+                const col_width = try calcColWidth(@intCast(item_idx), headers, table_ctx.col_width, table_win);
                 defer col_start += col_width;
-                const item = @field(fix, item_field.name);
-                const ItemT = @TypeOf(item);
+
                 const item_win = row_win.child(.{
                     .x_off = col_start,
                     .y_off = 0,
@@ -244,37 +245,7 @@ fn drawInner(
                     .height = 1,
                     .border = .{ .where = if (table_ctx.col_borders and col_idx > 0) .left else .none },
                 });
-                const item_txt = switch (ItemT) {
-                    []const u8 => item,
-                    [][]const u8, []const []const u8 => strSlice: {
-                        if (allocator) |_alloc| break :strSlice try fmt.allocPrint(_alloc, "{s}", .{item});
-                        break :strSlice item;
-                    },
-                    else => nonStr: {
-                        switch (@typeInfo(ItemT)) {
-                            .@"enum" => break :nonStr @tagName(item),
-                            .optional => {
-                                const opt_item = item orelse break :nonStr "-";
-                                switch (@typeInfo(ItemT).optional.child) {
-                                    []const u8 => break :nonStr opt_item,
-                                    [][]const u8, []const []const u8 => {
-                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{s}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Team)});
-                                    },
-                                    // janky!
-                                    f16, f32, f64 => {
-                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{d:.1}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Team)});
-                                    },
-                                    else => {
-                                        break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{opt_item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Team)});
-                                    },
-                                }
-                            },
-                            else => {
-                                break :nonStr if (allocator) |_alloc| try fmt.allocPrint(_alloc, "{any}", .{item}) else fmt.comptimePrint("[unsupported ({s})]", .{@typeName(Team)});
-                            },
-                        }
-                    },
-                };
+                const item_txt = try opponent.toString(allocator.?);
                 item_win.fill(.{ .style = .{ .bg = row_bg } });
                 const item_align_win = itemAlignWin: {
                     const col_align = switch (table_ctx.col_align) {

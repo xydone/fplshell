@@ -3,17 +3,9 @@ const Allocator = std.mem.Allocator;
 
 const Team = @This();
 
-first_gw: ?[]const u8,
-second_gw: ?[]const u8,
-third_gw: ?[]const u8,
 opponents: ?[]Match,
 name: ?[]const u8,
 
-pub fn deinit(self: Team, allocator: Allocator) void {
-    if (self.first_gw) |gw| allocator.free(gw);
-    if (self.second_gw) |gw| allocator.free(gw);
-    if (self.third_gw) |gw| allocator.free(gw);
-}
 pub const Match = struct {
     opponent_name: []const u8,
     opponent_short: []const u8,
@@ -30,9 +22,9 @@ pub const Match = struct {
 const empty = Team{
     .name = null,
     .opponents = null,
-    .first_gw = null,
-    .second_gw = null,
-    .third_gw = null,
+    // .first_gw = null,
+    // .second_gw = null,
+    // .third_gw = null,
 };
 
 pub const TeamLineup = struct {

@@ -56,3 +56,34 @@ pub fn deinit(self: Self, allocator: Allocator) void {
     if (self.context.sel_rows) |rows| allocator.free(rows);
     allocator.destroy(self.context);
 }
+
+pub fn getCellString(allocator: Allocator, ItemType: anytype, item: anytype) ![]const u8 {
+    return switch (ItemType) {
+        []const u8 => item,
+        [][]const u8, []const []const u8 => try fmt.allocPrint(allocator, "{s}", .{item}),
+        else => nonStr: {
+            switch (@typeInfo(ItemType)) {
+                .@"enum" => break :nonStr @tagName(item),
+                .optional => {
+                    const opt_item = item orelse break :nonStr "-";
+                    switch (@typeInfo(ItemType).optional.child) {
+                        []const u8 => break :nonStr opt_item,
+                        [][]const u8, []const []const u8 => {
+                            break :nonStr try fmt.allocPrint(allocator, "{s}", .{opt_item});
+                        },
+                        // janky!
+                        f16, f32, f64 => {
+                            break :nonStr try fmt.allocPrint(allocator, "{d:.1}", .{opt_item});
+                        },
+                        else => {
+                            break :nonStr try fmt.allocPrint(allocator, "{any}", .{opt_item});
+                        },
+                    }
+                },
+                else => {
+                    break :nonStr try fmt.allocPrint(allocator, "{any}", .{item});
+                },
+            }
+        },
+    };
+}

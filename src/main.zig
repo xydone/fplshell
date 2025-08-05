@@ -101,13 +101,7 @@ pub fn main() !void {
     }
 
     var team_map: std.AutoHashMapUnmanaged(u32, Team) = .empty;
-    defer {
-        defer team_map.deinit(allocator);
-        var it = team_map.valueIterator();
-        while (it.next()) |team| {
-            team.deinit(allocator);
-        }
-    }
+    defer team_map.deinit(allocator);
 
     var schedule_iterator = match_map.iterator();
     while (schedule_iterator.next()) |schedule| {
@@ -116,9 +110,9 @@ pub fn main() !void {
 
         const team = Team{
             .name = names.full,
-            .first_gw = try match.items[0].toString(allocator),
-            .second_gw = try match.items[1].toString(allocator),
-            .third_gw = try match.items[2].toString(allocator),
+            // .first_gw = try match.items[0].toString(allocator),
+            // .second_gw = try match.items[1].toString(allocator),
+            // .third_gw = try match.items[2].toString(allocator),
             .opponents = match.items,
         };
         try team_map.put(allocator, schedule.key_ptr.*, team);
@@ -199,7 +193,7 @@ pub fn main() !void {
     var selected = try PlayerTable.init(allocator, "Selected players");
     defer selected.deinit(allocator);
 
-    var fixture_table = try FixtureTable.init(allocator, 1);
+    var fixture_table = try FixtureTable.init(allocator, 1, 5);
     defer fixture_table.deinit(allocator);
 
     var active_menu: Menu = .search_table;
