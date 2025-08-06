@@ -83,10 +83,18 @@ pub const Player = struct {
 
 pub const Lineup = struct {
     players: [15]?Player,
+    team_value: f32,
+    transfers_made: u8,
+    free_transfers: u8,
+    hit_value: u8,
 
     pub fn init() Lineup {
         return Lineup{
             .players = [_]?Player{null} ** 15,
+            .team_value = 0,
+            .transfers_made = 0,
+            .free_transfers = 0,
+            .hit_value = 0,
         };
     }
 
@@ -96,6 +104,27 @@ pub const Lineup = struct {
                 buf[i] = pl;
             } else buf[i] = Player.empty;
         }
+    }
+
+    const LineupStats = struct {
+        starter_value: f32,
+        bench_value: f32,
+        in_the_bank: f32,
+    };
+    pub fn calculateStats(self: Lineup) LineupStats {
+        var stats: LineupStats = .{
+            .in_the_bank = 0,
+            .bench_value = 0,
+            .starter_value = 0,
+        };
+        for (self.players, 0..) |player, i| {
+            const is_starter = i <= 10;
+            if (player) |pl| if (pl.price) |price| {
+                if (is_starter) stats.starter_value += price else stats.bench_value += price;
+            };
+        }
+        stats.in_the_bank = self.team_value - (stats.starter_value + stats.bench_value);
+        return stats;
     }
 
     pub fn isValid(self: Lineup) bool {
@@ -185,6 +214,7 @@ pub const Lineup = struct {
         for (0..11) |i| {
             if (self.players[i] == null) {
                 self.players[i] = player;
+                self.team_value += player.price.?;
                 return;
             }
         }
@@ -196,6 +226,7 @@ pub const Lineup = struct {
         for (11..15) |i| {
             if (self.players[i] == null) {
                 self.players[i] = player;
+                self.team_value += player.price.?;
                 return;
             }
         }
@@ -203,6 +234,9 @@ pub const Lineup = struct {
     }
 
     pub fn remove(self: *Lineup, index: u16) void {
-        self.players[index] = null;
+        if (self.players[index]) |pl| {
+            self.team_value -= pl.price.?;
+            self.players[index] = null;
+        }
     }
 };

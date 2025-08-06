@@ -52,7 +52,21 @@ pub fn deinit(self: Self, allocator: Allocator) void {
     self.table.deinit(allocator);
 }
 
-pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, list: std.ArrayList(Player)) !void {
+// passing in a buf might be a bit annoying, but it saves an allocation soooo
+pub fn draw(
+    self: *Self,
+    allocator: Allocator,
+    win: Window,
+    table_win: Window,
+    lineup: Lineup,
+    bufs: struct {
+        stats_buf: *[1024]u8,
+        transfer_buf: *[1024]u8,
+    },
+) !void {
+    var lineup_buf: [15]Player = undefined;
+    lineup.toString(&lineup_buf);
+    const list = std.ArrayList(Player).fromOwnedSlice(allocator, &lineup_buf);
     // prepare segment
     const bar = win.child(.{
         .x_off = table_win.x_off,
@@ -63,7 +77,58 @@ pub fn draw(self: *Self, allocator: Allocator, win: Window, table_win: Window, l
 
     _ = bar.printSegment(self.table.segment.?, .{ .wrap = .word });
 
+    // draw team values
+    const team_value_window = win.child(.{
+        .x_off = table_win.x_off,
+        .y_off = table_win.height + 2,
+        .width = table_win.width,
+        .height = 1,
+    });
+    try drawTeamValues(team_value_window, bufs.stats_buf, lineup);
+
+    // draw transfers
+
+    // here we go!
+    const transfer_window = win.child(.{
+        .x_off = table_win.x_off,
+        .y_off = table_win.height + 3,
+        .width = table_win.width,
+        .height = 1,
+    });
+    try drawTransfers(transfer_window, bufs.transfer_buf, lineup);
+
     try drawInner(allocator, table_win, list, self.table.context);
+}
+
+fn drawTeamValues(window: Window, buf: *[1024]u8, lineup: Lineup) !void {
+    const stats = lineup.calculateStats();
+
+    const seg: vaxis.Cell.Segment = .{
+        .text = try std.fmt.bufPrint(buf, "TV: {d:.1} | XI: {d:.1} | Bench: {d:.1} | ITB: {d:.1}", .{
+            lineup.team_value,
+            stats.starter_value,
+            stats.bench_value,
+            stats.in_the_bank,
+        }),
+
+        .style = .{ .fg = .default, .bg = .default },
+    };
+
+    _ = window.printSegment(seg, .{});
+}
+
+fn drawTransfers(window: Window, buf: *[1024]u8, lineup: Lineup) !void {
+    const seg: vaxis.Cell.Segment = .{
+        .text = try std.fmt.bufPrint(buf, "FT: {} | TM: {} | Cost: {}", .{
+            lineup.free_transfers,
+            lineup.transfers_made,
+            lineup.transfers_made * lineup.hit_value,
+        }),
+
+        .style = .{ .fg = .default, .bg = .default },
+    };
+
+    _ = window.printSegment(seg, .{});
 }
 
 /// draw on the screen (fork of libvaxis's Table.Draw)
@@ -197,7 +262,7 @@ fn drawInner(
         const row_y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
         var row_win = table_win.child(.{
             .x_off = 0,
-            .y_off = row_y_off,
+            .y_off = if (row > 10) row_y_off + 1 else row_y_off,
             .width = table_win.width,
             .height = 1,
         });
@@ -205,6 +270,21 @@ fn drawInner(
             table_ctx.active_y_off = if (table_ctx.active_content_fn) |content| try content(&row_win, table_ctx.active_ctx) else 0;
         }
 
+        // draw a bench line
+        if (row == 10) {
+            const bench_win = table_win.child(.{
+                .x_off = 1,
+                .y_off = row_y_off + 1, // only increasing by 1 on the line before the bench to make sure this does not offset the entire table
+                .width = table_win.width,
+                .height = 1,
+            });
+
+            const segment = Segment{
+                .text = "Bench",
+                .style = .{},
+            };
+            _ = bench_win.printSegment(segment, .{ .wrap = .word });
+        }
         for (field_indexes) |f_idx| {
             inline for (item_fields[0..], 0..) |item_field, item_idx| contFields: {
                 switch (table_ctx.col_indexes) {

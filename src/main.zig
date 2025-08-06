@@ -8,7 +8,9 @@ const TextInput = vaxis.widgets.TextInput;
 const Key = vaxis.Key;
 const TableContext = vaxis.widgets.Table.TableContext;
 
+const TableCommon = @import("components/table_common.zig");
 const PlayerTable = @import("components/player_table.zig");
+const LineupTable = @import("components/lineup_table.zig");
 const FixtureTable = @import("components/fixture_table.zig");
 
 const Lineup = @import("lineup.zig").Lineup;
@@ -111,9 +113,6 @@ pub fn main() !void {
 
         const team = Team{
             .name = names.full,
-            // .first_gw = try match.items[0].toString(allocator),
-            // .second_gw = try match.items[1].toString(allocator),
-            // .third_gw = try match.items[2].toString(allocator),
             .opponents = match.items,
         };
         try team_map.put(allocator, schedule.key_ptr.*, team);
@@ -144,7 +143,7 @@ pub fn main() !void {
         // if team.json doesn't exist, leave lineup empty
         const team_data = Config.getTeam(allocator) catch break :readTeam;
         defer team_data.deinit();
-
+        lineup.team_value += @floatFromInt(team_data.value.transfers.bank / 10);
         for (team_data.value.picks) |pick| {
             const player = player_map.get(pick.element);
             if (player) |pl| {
@@ -191,7 +190,7 @@ pub fn main() !void {
     defer filtered.deinit(allocator);
     filtered.table.makeActive();
 
-    var selected = try PlayerTable.init(allocator, "Selected players");
+    var selected = try LineupTable.init(allocator, "Selected players");
     defer selected.deinit(allocator);
 
     var fixture_table = try FixtureTable.init(allocator, 1, 5);
@@ -225,16 +224,16 @@ pub fn main() !void {
                     }
                 }
                 row_navigation: {
-                    var active_table: *PlayerTable = switch (active_menu) {
-                        .search_table => &filtered,
-                        .selected => &selected,
+                    var active_table: *TableCommon = switch (active_menu) {
+                        .search_table => &filtered.table,
+                        .selected => &selected.table,
                         else => break :row_navigation,
                     };
 
                     if (key.matches(Key.up, .{})) {
-                        active_table.table.moveUp();
+                        active_table.moveUp();
                     } else if (key.matches(Key.down, .{})) {
-                        active_table.table.moveDown();
+                        active_table.moveDown();
                     }
                 }
 
@@ -392,7 +391,6 @@ pub fn main() !void {
             win,
             filtered_win,
             filtered_players,
-            false,
         );
 
         // lineup table
@@ -403,16 +401,19 @@ pub fn main() !void {
             .width = win.width / 3,
             .height = ROWS_PER_TABLE + 2,
         });
-        var buf: [15]Player = undefined;
-        lineup.toString(&buf);
-        const players = std.ArrayList(Player).fromOwnedSlice(allocator, &buf);
+
+        var stats_buf: [1024]u8 = undefined;
+        var transfer_buf: [1024]u8 = undefined;
 
         try selected.draw(
             event_alloc,
             win,
             selected_win,
-            players,
-            true,
+            lineup,
+            .{
+                .stats_buf = &stats_buf,
+                .transfer_buf = &transfer_buf,
+            },
         );
 
         // team table
