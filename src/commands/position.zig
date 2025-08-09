@@ -5,7 +5,25 @@ const Table = @import("../components/player_table.zig");
 const Player = @import("../lineup.zig").Player;
 const Position = Player.Position;
 
-const COMMANDS = [_][]const u8{ "position", "pos" };
+const CommandParams = @import("command.zig").Params;
+const Command = @import("command.zig");
+
+const enumToString = @import("../util/enumToString.zig").enumToString;
+
+var COMMANDS = [_][]const u8{ "position", "pos" };
+
+var PARAMS = [_]CommandParams{
+    .{
+        .name = enumToString(Position),
+        .description = "The position you want to filter by.",
+    },
+};
+
+pub const description = Command{
+    .phrases = &COMMANDS,
+    .description = "Filters the player database by positions",
+    .params = &PARAMS,
+};
 
 fn shouldCall(cmd: []const u8) bool {
     for (COMMANDS) |c| {

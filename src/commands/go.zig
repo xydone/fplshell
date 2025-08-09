@@ -1,7 +1,22 @@
 const std = @import("std");
 const Table = @import("../components/player_table.zig");
 
-const COMMANDS = [_][]const u8{ "go", "g" };
+const CommandParams = @import("command.zig").Params;
+const Command = @import("command.zig");
+
+var COMMANDS = [_][]const u8{ "go", "g" };
+var PARAMS = [_]CommandParams{
+    .{
+        .name = "<number>",
+        .description = "The line you want to go to.",
+    },
+};
+
+pub const description = Command{
+    .phrases = &COMMANDS,
+    .description = "Moves the filter table to a line.",
+    .params = &PARAMS,
+};
 
 fn shouldCall(cmd: []const u8) bool {
     for (COMMANDS) |c| {

@@ -56,6 +56,7 @@ pub const Player = struct {
             if (std.mem.eql(u8, "Forward", buf)) return .fwd;
             unreachable;
         }
+
         pub fn fromElementType(element_type: u8) Position {
             return switch (element_type) {
                 1 => .gk,

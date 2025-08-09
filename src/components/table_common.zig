@@ -27,8 +27,8 @@ const Self = @This();
 // Colors
 pub const active_row: Color = Colors.light_blue;
 pub const selected_row: Color = Colors.black;
-pub const selected_table: Color = Colors.gray;
-pub const normal_table: Color = Colors.light_gray;
+pub const selected_table: Color = Colors.black;
+pub const normal_table: Color = Colors.black;
 
 pub fn makeActive(self: *Self) void {
     self.context.active = true;

@@ -4,7 +4,22 @@ const Allocator = std.mem.Allocator;
 const Table = @import("../components/player_table.zig");
 const Player = @import("../lineup.zig").Player;
 
-const COMMANDS = [_][]const u8{ "search", "s" };
+const CommandParams = @import("command.zig").Params;
+const Command = @import("command.zig");
+
+var COMMANDS = [_][]const u8{ "search", "s" };
+var PARAMS = [_]CommandParams{
+    .{
+        .name = "<string>",
+        .description = "The name of the player.",
+    },
+};
+
+pub const description = Command{
+    .phrases = &COMMANDS,
+    .description = "Searches the player database for players with a matching name.",
+    .params = &PARAMS,
+};
 
 fn shouldCall(cmd: []const u8) bool {
     for (COMMANDS) |c| {

@@ -2,7 +2,27 @@ const std = @import("std");
 const Table = @import("../components/player_table.zig");
 const Player = @import("../lineup.zig").Player;
 
-const COMMANDS = [_][]const u8{"sort"};
+const CommandParams = @import("command.zig").Params;
+const Command = @import("command.zig");
+
+const enumToString = @import("../util/enumToString.zig").enumToString;
+
+const SortTypes = enum { desc, asc };
+
+var COMMANDS = [_][]const u8{"sort"};
+
+var PARAMS = [_]CommandParams{
+    .{
+        .name = enumToString(SortTypes),
+        .description = "The sort type.",
+    },
+};
+
+pub const description = Command{
+    .phrases = &COMMANDS,
+    .description = "Sorts the player database by price.", //NOTE: update this when sorting is implemented for other things like EV
+    .params = &PARAMS,
+};
 
 fn shouldCall(cmd: []const u8) bool {
     for (COMMANDS) |c| {
@@ -28,7 +48,6 @@ fn call(params: Params) Errors!void {
     const items = filtered_players.items;
     filtered_players.clearRetainingCapacity();
 
-    const SortTypes = enum { desc, asc };
     const sort = std.meta.stringToEnum(SortTypes, string) orelse return error.UnknownSortType;
     switch (sort) {
         .asc => {

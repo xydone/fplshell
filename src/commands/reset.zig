@@ -2,7 +2,16 @@ const std = @import("std");
 const Table = @import("../components/player_table.zig");
 const Player = @import("../lineup.zig").Player;
 
-const COMMANDS = [_][]const u8{ "reset", "r", "res" };
+const CommandParams = @import("command.zig").Params;
+const Command = @import("command.zig");
+
+var COMMANDS = [_][]const u8{ "reset", "res" };
+
+pub const description = Command{
+    .phrases = &COMMANDS,
+    .description = "Resets the filters.",
+    .params = null,
+};
 
 fn shouldCall(cmd: []const u8) bool {
     for (COMMANDS) |c| {

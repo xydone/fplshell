@@ -4,7 +4,16 @@ const Table = @import("../components/player_table.zig");
 const GetStatic = @import("../fpl.zig").GetStatic;
 const GetFixtures = @import("../fpl.zig").GetFixtures;
 
-const COMMANDS = [_][]const u8{ "refresh", "refetch" };
+var COMMANDS = [_][]const u8{"refresh"};
+
+const CommandParams = @import("command.zig").Params;
+const Command = @import("command.zig");
+
+pub const description = Command{
+    .phrases = &COMMANDS,
+    .description = "Refreshes all the data that is fetched from FPL",
+    .params = null,
+};
 
 fn shouldCall(cmd: []const u8) bool {
     for (COMMANDS) |c| {

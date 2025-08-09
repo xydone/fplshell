@@ -8,6 +8,9 @@ const TextInput = vaxis.widgets.TextInput;
 const Key = vaxis.Key;
 const TableContext = vaxis.widgets.Table.TableContext;
 
+const CommandDescription = @import("commands/command.zig");
+
+const CommandHelper = @import("components/command_helper.zig");
 const TableCommon = @import("components/table_common.zig");
 const PlayerTable = @import("components/player_table.zig");
 const LineupTable = @import("components/lineup_table.zig");
@@ -153,6 +156,16 @@ pub fn main() !void {
             }
         }
     }
+
+    var descriptions = [_]CommandDescription{
+        Go.description,
+        Refresh.description,
+        Search.description,
+        Reset.description,
+        Position.description,
+        Sort.description,
+    };
+    var command_helper: CommandHelper = .init(&descriptions);
 
     // Terminal stuff
 
@@ -443,7 +456,10 @@ pub fn main() !void {
                 .height = 1,
             });
             bottom_bar.fill(.{ .style = .{ .bg = Colors.light_blue } });
-            cmd_input.draw(bottom_bar);
+            cmd_input.drawWithStyle(bottom_bar, .{ .bg = Colors.light_blue });
+
+            const message = cmd_input.buf.firstHalf();
+            try command_helper.draw(win, message);
         }
 
         const tty_writer = tty_buf_writer.writer().any();
