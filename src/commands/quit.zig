@@ -12,13 +12,9 @@ pub const description = Command{
     .params = null,
 };
 
-fn shouldCall(cmd: []const u8) bool {
+pub fn shouldCall(cmd: []const u8) bool {
     for (COMMANDS) |c| {
         if (std.mem.eql(u8, c, cmd)) return true;
     }
     return false;
-}
-
-pub fn handle(cmd: []const u8) bool {
-    return shouldCall(cmd);
 }

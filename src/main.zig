@@ -41,6 +41,16 @@ const Menu = enum {
     cmd,
 };
 
+const command_list = [_]type{
+    Go,
+    Refresh,
+    Search,
+    Reset,
+    Position,
+    Sort,
+    Quit,
+};
+
 pub fn main() !void {
     var allocator_instance = std.heap.GeneralPurposeAllocator(.{
         .stack_trace_frames = if (std.debug.sys_can_stack_trace) 10 else 0,
@@ -158,15 +168,11 @@ pub fn main() !void {
         }
     }
 
-    var descriptions = [_]CommandDescription{
-        Go.description,
-        Refresh.description,
-        Search.description,
-        Reset.description,
-        Position.description,
-        Sort.description,
-        Quit.description,
-    };
+    var descriptions: [command_list.len]CommandDescription = undefined;
+    inline for (command_list, 0..) |cmd, i| {
+        descriptions[i] = cmd.description;
+    }
+
     var command_helper: CommandHelper = .init(&descriptions);
 
     // Terminal stuff
@@ -280,57 +286,60 @@ pub fn main() !void {
 
                             const arg = message[1..];
 
-                            const quit = Quit.handle(arg);
-                            if (quit) return;
-
                             var it = std.mem.tokenizeSequence(u8, arg, " ");
                             if (it.next()) |command| {
-                                // TODO: error handling for all commands
-                                const go = Go.handle(command, .{
-                                    .it = &it,
-                                    .players_table = &filtered,
-                                }) catch break :cmd;
-                                if (go) break :cmd;
-
-                                const refresh = Refresh.handle(command, .{
-                                    .allocator = allocator,
-                                    .static_data = &static_data,
-                                    .fixtures_data = &fixtures_data,
-                                }) catch break :cmd;
-                                if (refresh) break :cmd;
-
-                                const search = Search.handle(command, .{
-                                    .allocator = event_alloc,
-                                    .it = it,
-                                    .player_map = player_map,
-                                    .player_table = &filtered,
-                                    .filtered_players = &filtered_players,
-                                }) catch break :cmd;
-
-                                if (search) break :cmd;
-
-                                const sort = Sort.handle(command, .{
-                                    .it = &it,
-                                    .filtered_players = &filtered_players,
-                                }) catch break :cmd;
-
-                                if (sort) break :cmd;
-
-                                const filter = Position.handle(command, .{
-                                    .it = it,
-                                    .player_table = &filtered,
-                                    .filtered_players = &filtered_players,
-                                    .all_players = all_players,
-                                }) catch break :cmd;
-
-                                if (filter) break :cmd;
-
-                                const reset = Reset.handle(command, .{
-                                    .filtered_players = &filtered_players,
-                                    .all_players = &all_players,
-                                }) catch break :cmd;
-
-                                if (reset) break :cmd;
+                                inline for (command_list) |Cmd| {
+                                    // TODO: error handling for all commands
+                                    switch (Cmd) {
+                                        Go => {
+                                            try Go.handle(command, .{
+                                                .it = &it,
+                                                .players_table = &filtered,
+                                            });
+                                        },
+                                        Refresh => {
+                                            try Refresh.handle(command, .{
+                                                .allocator = allocator,
+                                                .static_data = &static_data,
+                                                .fixtures_data = &fixtures_data,
+                                            });
+                                        },
+                                        Search => {
+                                            try Search.handle(command, .{
+                                                .allocator = event_alloc,
+                                                .it = it,
+                                                .player_map = player_map,
+                                                .player_table = &filtered,
+                                                .filtered_players = &filtered_players,
+                                            });
+                                        },
+                                        Sort => {
+                                            try Sort.handle(command, .{
+                                                .it = &it,
+                                                .filtered_players = &filtered_players,
+                                            });
+                                        },
+                                        Position => {
+                                            try Position.handle(command, .{
+                                                .it = it,
+                                                .player_table = &filtered,
+                                                .filtered_players = &filtered_players,
+                                                .all_players = all_players,
+                                            });
+                                        },
+                                        Reset => {
+                                            try Reset.handle(command, .{
+                                                .filtered_players = &filtered_players,
+                                                .all_players = &all_players,
+                                            });
+                                        },
+                                        Quit => {
+                                            const quit = Quit.shouldCall(arg);
+                                            if (quit) return;
+                                        },
+                                        else => @compileError(std.fmt.comptimePrint("No implementation for command {}.", .{Cmd})),
+                                    }
+                                }
                             }
                         } else {
                             // add the text into the buffer

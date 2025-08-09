@@ -62,10 +62,8 @@ fn call(params: Params) Errors!void {
     }
 }
 
-pub fn handle(cmd: []const u8, params: Params) Errors!bool {
-    const should_call = shouldCall(cmd);
-    if (should_call) {
+pub fn handle(cmd: []const u8, params: Params) Errors!void {
+    if (shouldCall(cmd)) {
         try call(params);
     }
-    return should_call;
 }
