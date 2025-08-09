@@ -32,6 +32,7 @@ const Search = @import("commands/search.zig");
 const Reset = @import("commands/reset.zig");
 const Position = @import("commands/position.zig");
 const Sort = @import("commands/sort.zig");
+const Quit = @import("commands/quit.zig");
 
 const Menu = enum {
     gameweek_selector,
@@ -164,6 +165,7 @@ pub fn main() !void {
         Reset.description,
         Position.description,
         Sort.description,
+        Quit.description,
     };
     var command_helper: CommandHelper = .init(&descriptions);
 
@@ -277,9 +279,9 @@ pub fn main() !void {
                             if (message.len == 0) break :cmd;
 
                             const arg = message[1..];
-                            if (std.mem.eql(u8, "q", arg) or
-                                std.mem.eql(u8, "quit", arg) or
-                                std.mem.eql(u8, "exit", arg)) return;
+
+                            const quit = Quit.handle(arg);
+                            if (quit) return;
 
                             var it = std.mem.tokenizeSequence(u8, arg, " ");
                             if (it.next()) |command| {
