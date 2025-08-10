@@ -8,7 +8,8 @@ pub const light_blue: Color = .{ .rgb = .{ 50, 133, 166 } };
 pub const black: Color = .{ .rgb = .{ 0, 0, 0 } };
 pub const white: Color = .{ .rgb = .{ 255, 255, 255 } };
 
-pub const gray: Color = .{ .rgb = .{ 186, 182, 182 } };
+pub const light_gray: Color = .{ .rgb = .{ 182, 182, 182 } };
+pub const gray: Color = .{ .rgb = .{ 124, 124, 124 } };
 
 pub fn getTextColor(color: Color) Color {
     const r = color.rgb[0];
