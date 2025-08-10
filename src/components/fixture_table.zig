@@ -25,7 +25,7 @@ const selected_table = TableCommon.selected_table;
 const normal_table = TableCommon.normal_table;
 
 table: TableCommon,
-header_names: [][]u8,
+header_names: *std.ArrayListUnmanaged([]u8),
 start_index: u8,
 end_index: u8,
 
@@ -35,10 +35,11 @@ pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
     const gameweek_count = last_gw - first_gw + 1;
     const context = try allocator.create(TableContext);
 
-    const header_names = try allocator.alloc([]u8, gameweek_count);
+    const header_names = try allocator.create(std.ArrayListUnmanaged([]u8));
+    header_names.* = try std.ArrayListUnmanaged([]u8).initCapacity(allocator, gameweek_count);
 
     for (0..gameweek_count) |i| {
-        header_names[i] = try std.fmt.allocPrint(allocator, "GW{}", .{i + 1});
+        header_names.appendAssumeCapacity(try std.fmt.allocPrint(allocator, "GW{}", .{i + 1}));
     }
 
     context.* = .{
@@ -47,7 +48,7 @@ pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
         .row_bg_1 = normal_table,
         .row_bg_2 = normal_table,
         .selected_bg = selected_row,
-        .header_names = .{ .custom = header_names },
+        .header_names = .{ .custom = header_names.items },
     };
     const table = TableCommon{
         .segment = null,
@@ -63,20 +64,27 @@ pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
 }
 
 fn updateHeaders(self: *Self, allocator: Allocator, range_start: u8, range_end: u8) !void {
-    const range = range_end - range_start + 1;
-    for (0..range) |i| {
-        allocator.free(self.header_names[i]);
-        self.header_names[i] = try std.fmt.allocPrint(allocator, "GW{}", .{range_start + i});
+    // free existing headers
+    for (0..self.header_names.items.len) |i| {
+        allocator.free(self.header_names.items[i]);
     }
+    self.header_names.clearRetainingCapacity();
+    const range = range_end - range_start + 1;
+
+    for (0..range) |i| {
+        try self.header_names.append(allocator, try std.fmt.allocPrint(allocator, "GW{}", .{range_start + i}));
+    }
+    self.table.context.header_names = .{ .custom = self.header_names.items };
 }
 
+const SetRangeErrors = error{InvalidRange};
 /// Changes the fixture gameweek range, if there's a null start/end value, it remains the same.
-pub fn setRange(self: *Self, allocator: Allocator, start_index: ?u8, end_index: ?u8) void {
+pub fn setRange(self: *Self, allocator: Allocator, start_index: ?u8, end_index: ?u8) SetRangeErrors!void {
     const LOWER_BOUND = 1;
     const UPPER_BOUND = 38;
     const range = (end_index orelse self.end_index) - (start_index orelse self.start_index);
     if (start_index) |idx| {
-        if (idx < LOWER_BOUND or idx > UPPER_BOUND - range) return;
+        if (idx < LOWER_BOUND or idx > UPPER_BOUND - range) return error.InvalidRange;
         self.start_index = idx;
     }
     if (end_index) |idx| {
@@ -89,10 +97,11 @@ pub fn setRange(self: *Self, allocator: Allocator, start_index: ?u8, end_index: 
 pub fn deinit(self: Self, allocator: Allocator) void {
     self.table.deinit(allocator);
 
-    for (self.header_names) |header| {
+    for (self.header_names.items) |header| {
         allocator.free(header);
     }
-    allocator.free(self.header_names);
+    self.header_names.deinit(allocator);
+    allocator.destroy(self.header_names);
 }
 pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.ArrayList(Team)) !void {
     try drawInner(

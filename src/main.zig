@@ -33,6 +33,7 @@ const Reset = @import("commands/reset.zig");
 const Position = @import("commands/position.zig");
 const Sort = @import("commands/sort.zig");
 const Quit = @import("commands/quit.zig");
+const Horizon = @import("commands/horizon.zig");
 
 const Menu = enum {
     gameweek_selector,
@@ -49,6 +50,7 @@ const command_list = [_]type{
     Position,
     Sort,
     Quit,
+    Horizon,
 };
 
 pub fn main() !void {
@@ -268,11 +270,11 @@ pub fn main() !void {
                         if (key.matchExact(Key.left, .{})) {
                             const start = fixture_table.start_index - 1;
                             const end = fixture_table.end_index - 1;
-                            fixture_table.setRange(allocator, start, end);
+                            try fixture_table.setRange(allocator, start, end);
                         } else if (key.matches(Key.right, .{})) {
                             const start = fixture_table.start_index + 1;
                             const end = fixture_table.end_index + 1;
-                            fixture_table.setRange(allocator, start, end);
+                            try fixture_table.setRange(allocator, start, end);
                         }
                     },
                     .cmd => cmd: {
@@ -336,6 +338,13 @@ pub fn main() !void {
                                         Quit => {
                                             const quit = Quit.shouldCall(arg);
                                             if (quit) return;
+                                        },
+                                        Horizon => {
+                                            try Horizon.handle(command, .{
+                                                .allocator = allocator,
+                                                .fixture_table = &fixture_table,
+                                                .it = &it,
+                                            });
                                         },
                                         else => @compileError(std.fmt.comptimePrint("No implementation for command {}.", .{Cmd})),
                                     }
