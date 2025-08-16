@@ -1,40 +1,3 @@
-const std = @import("std");
-const Player = @import("lineup.zig").Player;
-
-const Config = @import("config.zig");
-
-const vaxis = @import("vaxis");
-const TextInput = vaxis.widgets.TextInput;
-const Key = vaxis.Key;
-const TableContext = vaxis.widgets.Table.TableContext;
-
-const CommandDescription = @import("commands/command.zig");
-
-const CommandHelper = @import("components/command_helper.zig");
-const TableCommon = @import("components/table_common.zig");
-const PlayerTable = @import("components/player_table.zig");
-const LineupTable = @import("components/lineup_table.zig");
-const FixtureTable = @import("components/fixture_table.zig");
-
-const Lineup = @import("lineup.zig").Lineup;
-
-const Team = @import("team.zig");
-const Match = Team.Match;
-
-const Colors = @import("colors.zig");
-const Teams = @import("fpl.zig").Teams;
-const GetStatic = @import("fpl.zig").GetStatic;
-const GetFixtures = @import("fpl.zig").GetFixtures;
-
-const Go = @import("commands/go.zig");
-const Refresh = @import("commands/refresh.zig");
-const Search = @import("commands/search.zig");
-const Reset = @import("commands/reset.zig");
-const Position = @import("commands/position.zig");
-const Sort = @import("commands/sort.zig");
-const Quit = @import("commands/quit.zig");
-const Horizon = @import("commands/horizon.zig");
-
 const Menu = enum {
     gameweek_selector,
     search_table,
@@ -493,3 +456,50 @@ const Event = union(enum) {
     winsize: vaxis.Winsize,
     focus_in,
 };
+
+const Player = @import("lineup.zig").Player;
+
+const Config = @import("config.zig");
+
+const vaxis = @import("vaxis");
+const TextInput = vaxis.widgets.TextInput;
+const Key = vaxis.Key;
+const TableContext = vaxis.widgets.Table.TableContext;
+
+const CommandDescription = @import("commands/command.zig");
+
+const CommandHelper = @import("components/command_helper.zig");
+const TableCommon = @import("components/table_common.zig");
+const PlayerTable = @import("components/player_table.zig");
+const LineupTable = @import("components/lineup_table.zig");
+const FixtureTable = @import("components/fixture_table.zig");
+
+const Lineup = @import("lineup.zig").Lineup;
+
+const Team = @import("team.zig");
+const Match = Team.Match;
+
+const Colors = @import("colors.zig");
+const Teams = @import("fpl.zig").Teams;
+const GetStatic = @import("fpl.zig").GetStatic;
+const GetFixtures = @import("fpl.zig").GetFixtures;
+
+const Go = @import("commands/go.zig");
+const Refresh = @import("commands/refresh.zig");
+const Search = @import("commands/search.zig");
+const Reset = @import("commands/reset.zig");
+const Position = @import("commands/position.zig");
+const Sort = @import("commands/sort.zig");
+const Quit = @import("commands/quit.zig");
+const Horizon = @import("commands/horizon.zig");
+
+const std = @import("std");
+
+test "tests:beforeAll" {
+    std.testing.refAllDecls(@This());
+}
+
+test "tests:afterAll" {
+    const Benchmark = @import("test_runner.zig").Benchmark;
+    Benchmark.analyze(std.heap.smp_allocator);
+}

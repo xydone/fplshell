@@ -36,7 +36,7 @@ pub fn build(b: *std.Build) void {
 
     const exe_unit_tests = b.addTest(.{
         .root_module = module,
-        .test_runner = .{ .path = b.path("src/tests/test_runner.zig"), .mode = .simple },
+        .test_runner = .{ .path = b.path("src/test_runner.zig"), .mode = .simple },
     });
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
@@ -55,6 +55,8 @@ pub fn build(b: *std.Build) void {
         .name = "fplshell",
         .root_module = module,
     });
+
     const check = b.step("check", "Check if fplshell compiles");
+
     check.dependOn(&exe_check.step);
 }

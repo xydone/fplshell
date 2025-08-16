@@ -1,9 +1,3 @@
-const std = @import("std");
-const Table = @import("../components/player_table.zig");
-
-const CommandParams = @import("command.zig").Params;
-const Command = @import("command.zig");
-
 var COMMANDS = [_][]const u8{ "go", "g" };
 var PARAMS = [_]CommandParams{
     .{
@@ -42,4 +36,90 @@ pub fn handle(cmd: []const u8, params: Params) Errors!void {
     if (shouldCall(cmd)) {
         try call(params);
     }
+}
+
+const Table = @import("../components/player_table.zig");
+
+const CommandParams = @import("command.zig").Params;
+const Command = @import("command.zig");
+
+const std = @import("std");
+
+test "Command | Go (regular)" {
+    const test_name = "Command | Go (regular)";
+    const Benchmark = @import("../test_runner.zig").Benchmark;
+    const allocator = std.testing.allocator;
+    var table = try Table.init(allocator, "Sample text");
+    defer table.deinit(allocator);
+
+    const input = "go 10";
+    var it = std.mem.tokenizeSequence(u8, input, " ");
+    const command = it.next().?;
+
+    const params = Params{ .players_table = &table, .it = &it };
+
+    var benchmark = Benchmark.start(test_name);
+    defer benchmark.end();
+
+    handle(command, params) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+
+    std.testing.expectEqual(10, table.table.context.row) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+}
+
+test "Command | Go (negative)" {
+    const test_name = "Command | Go (negative)";
+    const Benchmark = @import("../test_runner.zig").Benchmark;
+    const allocator = std.testing.allocator;
+    var table = try Table.init(allocator, "Sample text");
+    defer table.deinit(allocator);
+
+    const input = "go -10";
+    var it = std.mem.tokenizeSequence(u8, input, " ");
+    const command = it.next().?;
+
+    const params = Params{ .players_table = &table, .it = &it };
+
+    var benchmark = Benchmark.start(test_name);
+    defer benchmark.end();
+
+    handle(command, params) catch |err| switch (err) {
+        error.TokenNaN => {},
+        else => {
+            benchmark.fail(err);
+            return err;
+        },
+    };
+}
+
+test "Command | Go (formatting)" {
+    const test_name = "Command | Go (formatting)";
+    const Benchmark = @import("../test_runner.zig").Benchmark;
+    const allocator = std.testing.allocator;
+    var table = try Table.init(allocator, "Sample text");
+    defer table.deinit(allocator);
+
+    const input = "go 10_000";
+    var it = std.mem.tokenizeSequence(u8, input, " ");
+    const command = it.next().?;
+
+    const params = Params{ .players_table = &table, .it = &it };
+
+    var benchmark = Benchmark.start(test_name);
+    defer benchmark.end();
+
+    handle(command, params) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+
+    std.testing.expectEqual(10_000, table.table.context.row) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
 }
