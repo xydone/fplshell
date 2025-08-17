@@ -122,15 +122,16 @@ pub fn main() !void {
         // if team.json doesn't exist, leave lineup empty
         const team_data = Config.getTeam(allocator) catch break :readTeam;
         defer team_data.deinit();
-        lineup.team_value += @floatFromInt(team_data.value.transfers.bank / 10);
         for (team_data.value.picks) |pick| {
             const player = player_map.get(pick.element);
             if (player) |pl| {
-                try lineup.appendAny(pl);
+                try lineup.appendRaw(pl);
                 const team = team_map.get(pl.team_id.?) orelse @panic("Team not found in team map!");
                 try team_lineup.appendAny(team);
             }
         }
+        lineup.in_the_bank = @floatFromInt(team_data.value.transfers.bank / 10);
+        lineup.lineup_value = @floatFromInt(team_data.value.transfers.value / 10);
     }
 
     var descriptions: [command_list.len]CommandDescription = undefined;
@@ -321,7 +322,7 @@ pub fn main() !void {
                     .search_table => search_table: {
                         const currently_selected_player = filtered_players.items[filtered.table.context.row];
                         if (key.matchExact(Key.enter, .{})) {
-                            lineup.appendAny(currently_selected_player) catch {
+                            lineup.append(currently_selected_player) catch {
                                 //TODO: signify selection full somehow?
                                 break :search_table;
                             };

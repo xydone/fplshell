@@ -1,10 +1,3 @@
-const std = @import("std");
-const Allocator = std.mem.Allocator;
-
-const Colors = @import("colors.zig");
-const Color = Colors.Color;
-const Teams = @import("fpl.zig").Teams;
-
 pub const Player = struct {
     position_name: ?[]const u8,
     name: ?[]const u8,
@@ -84,7 +77,8 @@ pub const Player = struct {
 
 pub const Lineup = struct {
     players: [15]?Player,
-    team_value: f32,
+    lineup_value: f32,
+    in_the_bank: f32,
     transfers_made: u8,
     free_transfers: u8,
     hit_value: u8,
@@ -92,7 +86,8 @@ pub const Lineup = struct {
     pub fn init() Lineup {
         return Lineup{
             .players = [_]?Player{null} ** 15,
-            .team_value = 0,
+            .lineup_value = 0,
+            .in_the_bank = 0,
             .transfers_made = 0,
             .free_transfers = 0,
             .hit_value = 0,
@@ -105,27 +100,6 @@ pub const Lineup = struct {
                 buf[i] = pl;
             } else buf[i] = Player.empty;
         }
-    }
-
-    const LineupStats = struct {
-        starter_value: f32,
-        bench_value: f32,
-        in_the_bank: f32,
-    };
-    pub fn calculateStats(self: Lineup) LineupStats {
-        var stats: LineupStats = .{
-            .in_the_bank = 0,
-            .bench_value = 0,
-            .starter_value = 0,
-        };
-        for (self.players, 0..) |player, i| {
-            const is_starter = i <= 10;
-            if (player) |pl| if (pl.price) |price| {
-                if (is_starter) stats.starter_value += price else stats.bench_value += price;
-            };
-        }
-        stats.in_the_bank = self.team_value - (stats.starter_value + stats.bench_value);
-        return stats;
     }
 
     pub fn isValid(self: Lineup) bool {
@@ -197,37 +171,29 @@ pub const Lineup = struct {
         return pseudo_lineup.isValid();
     }
 
-    pub const AppendErrors = error{SelectionFull};
-
-    pub fn appendAny(self: *Lineup, player: Player) AppendErrors!void {
+    pub const AppendErrors = error{ SelectionFull, MissingFunds };
+    pub fn append(self: *Lineup, player: Player) AppendErrors!void {
         // check if we can append a player before appending
         // if not possible exit early
         if (!self.canAppend(player)) return error.SelectionFull;
-        self.appendStarter(player) catch {
-            // if we cannot append as a starter, append as bench
-            // return SelectionFull if we cannot append as bench either
-            try self.appendBench(player);
-        };
-    }
-
-    /// Does not check if lineup is valid.
-    pub fn appendStarter(self: *Lineup, player: Player) AppendErrors!void {
-        for (0..11) |i| {
+        inline for (0..15) |i| {
             if (self.players[i] == null) {
+                if (self.in_the_bank - player.price.? < 0) return error.MissingFunds;
                 self.players[i] = player;
-                self.team_value += player.price.?;
+                self.lineup_value += player.price.?;
+                self.in_the_bank -= player.price.?;
+
                 return;
             }
         }
         return error.SelectionFull;
     }
 
-    /// Does not check if lineup is valid.
-    pub fn appendBench(self: *Lineup, player: Player) AppendErrors!void {
-        for (11..15) |i| {
+    /// Appends will not affect team and itb value
+    pub fn appendRaw(self: *Lineup, player: Player) error{SelectionFull}!void {
+        inline for (0..15) |i| {
             if (self.players[i] == null) {
                 self.players[i] = player;
-                self.team_value += player.price.?;
                 return;
             }
         }
@@ -236,8 +202,17 @@ pub const Lineup = struct {
 
     pub fn remove(self: *Lineup, index: u16) void {
         if (self.players[index]) |pl| {
-            self.team_value -= pl.price.?;
+            self.lineup_value -= pl.price.?;
+            self.in_the_bank += pl.price.?;
             self.players[index] = null;
         }
     }
 };
+
+const Colors = @import("colors.zig");
+const Color = Colors.Color;
+const Teams = @import("fpl.zig").Teams;
+
+const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
+const std = @import("std");

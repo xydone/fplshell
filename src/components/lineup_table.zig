@@ -101,14 +101,10 @@ pub fn draw(
 }
 
 fn drawTeamValues(window: Window, buf: *[1024]u8, lineup: Lineup) !void {
-    const stats = lineup.calculateStats();
-
     const seg: vaxis.Cell.Segment = .{
-        .text = try std.fmt.bufPrint(buf, "TV: {d:.1} | XI: {d:.1} | Bench: {d:.1} | ITB: {d:.1}", .{
-            lineup.team_value,
-            stats.starter_value,
-            stats.bench_value,
-            stats.in_the_bank,
+        .text = try std.fmt.bufPrint(buf, "TV: {d:.1} | ITB: {d:.1}", .{
+            lineup.lineup_value,
+            lineup.in_the_bank,
         }),
 
         .style = .{ .fg = .default, .bg = .default },
