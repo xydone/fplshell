@@ -1,10 +1,3 @@
-const Menu = enum {
-    gameweek_selector,
-    search_table,
-    selected,
-    cmd,
-};
-
 const command_list = [_]type{
     Go,
     Refresh,
@@ -187,6 +180,9 @@ pub fn main() !void {
     // Used for smooth transitioning in and out of the gameweek selector menu
     var previous_menu: Menu = active_menu;
 
+    var error_message: ErrorMessage = try .init(allocator, &previous_menu, &active_menu);
+    defer error_message.deinit(allocator);
+
     while (true) {
         defer _ = event_arena.reset(.retain_capacity);
         defer tty_buf_writer.flush() catch {};
@@ -198,6 +194,10 @@ pub fn main() !void {
             .key_press => |key| {
                 if (key.matches('c', .{ .ctrl = true })) {
                     break;
+                }
+                // if in error message state, wait for button press to clear message
+                if (active_menu == .error_message) {
+                    error_message.clearMessage();
                 }
                 if (key.matchExact(Key.tab, .{})) {
                     switch (active_menu) {
@@ -230,6 +230,7 @@ pub fn main() !void {
                 }
 
                 switch (active_menu) {
+                    .error_message => {},
                     .gameweek_selector => {
                         if (key.matchExact(Key.left, .{})) {
                             const start = fixture_table.start_index - 1;
@@ -255,60 +256,95 @@ pub fn main() !void {
                             var it = std.mem.tokenizeSequence(u8, arg, " ");
                             if (it.next()) |command| {
                                 inline for (command_list) |Cmd| {
-                                    // TODO: error handling for all commands
                                     switch (Cmd) {
                                         Go => {
-                                            try Go.handle(command, .{
+                                            Go.handle(command, .{
                                                 .it = &it,
                                                 .players_table = &filtered,
-                                            });
+                                            }) catch |err| switch (err) {
+                                                Go.Errors.EmptyToken => {},
+                                                Go.Errors.TokenNaN => {
+                                                    try error_message.setErrorMessage("Line number is not a number!", .cmd);
+                                                },
+                                            };
                                         },
                                         Refresh => {
-                                            try Refresh.handle(command, .{
+                                            Refresh.handle(command, .{
                                                 .allocator = allocator,
                                                 .static_data = &static_data,
                                                 .fixtures_data = &fixtures_data,
-                                            });
+                                            }) catch |err| switch (err) {
+                                                Refresh.Errors.FailedToRefetch => {
+                                                    try error_message.setErrorMessage("Failed to fetch data!", .cmd);
+                                                },
+                                            };
                                         },
                                         Search => {
-                                            try Search.handle(command, .{
+                                            Search.handle(command, .{
                                                 .allocator = event_alloc,
                                                 .it = it,
                                                 .player_map = player_map,
                                                 .player_table = &filtered,
                                                 .filtered_players = &filtered_players,
-                                            });
+                                            }) catch |err| switch (err) {
+                                                Search.Errors.EmptyString => {
+                                                    try error_message.setErrorMessage("You must enter a string!", .cmd);
+                                                },
+                                                Search.Errors.OOM => return err,
+                                            };
                                         },
                                         Sort => {
-                                            try Sort.handle(command, .{
+                                            Sort.handle(command, .{
                                                 .it = &it,
                                                 .filtered_players = &filtered_players,
-                                            });
+                                            }) catch |err| switch (err) {
+                                                Sort.Errors.EmptyString => {},
+                                                Sort.Errors.UnknownSortType => {
+                                                    try error_message.setErrorMessage("You must enter a valid sort type!", .cmd);
+                                                },
+                                                Sort.Errors.OOM => return err,
+                                            };
                                         },
                                         Position => {
-                                            try Position.handle(command, .{
+                                            Position.handle(command, .{
                                                 .it = it,
                                                 .player_table = &filtered,
                                                 .filtered_players = &filtered_players,
                                                 .all_players = all_players,
-                                            });
+                                            }) catch |err| switch (err) {
+                                                Position.Errors.EmptyString => {},
+                                                Position.Errors.InvalidPosition => {
+                                                    try error_message.setErrorMessage("You must enter a valid position!", .cmd);
+                                                },
+                                                Position.Errors.OOM => return err,
+                                            };
                                         },
                                         Reset => {
-                                            try Reset.handle(command, .{
+                                            Reset.handle(command, .{
                                                 .filtered_players = &filtered_players,
                                                 .all_players = &all_players,
-                                            });
+                                            }) catch |err| switch (err) {
+                                                Reset.Errors.OOM => return err,
+                                            };
                                         },
                                         Quit => {
                                             const quit = Quit.shouldCall(arg);
                                             if (quit) return;
                                         },
                                         Horizon => {
-                                            try Horizon.handle(command, .{
+                                            Horizon.handle(command, .{
                                                 .allocator = allocator,
                                                 .fixture_table = &fixture_table,
                                                 .it = &it,
-                                            });
+                                            }) catch |err| switch (err) {
+                                                Horizon.Errors.EmptyEndToken, Horizon.Errors.EmptyStartToken => {},
+                                                Horizon.Errors.InvalidRange => {
+                                                    try error_message.setErrorMessage("You must enter a valid range!", .cmd);
+                                                },
+                                                Horizon.Errors.StartTokenNaN, Horizon.Errors.EndTokenNaN => {
+                                                    try error_message.setErrorMessage("You must enter a number!", .cmd);
+                                                },
+                                            };
                                         },
                                         else => @compileError(std.fmt.comptimePrint("No implementation for command {}.", .{Cmd})),
                                     }
@@ -322,8 +358,11 @@ pub fn main() !void {
                     .search_table => search_table: {
                         const currently_selected_player = filtered_players.items[filtered.table.context.row];
                         if (key.matchExact(Key.enter, .{})) {
-                            selection.append(currently_selected_player) catch {
-                                //TODO: signify selection full somehow?
+                            selection.append(currently_selected_player) catch |err| {
+                                switch (err) {
+                                    Selection.AppendErrors.MissingFunds => try error_message.setErrorMessage("Insufficient funds!", .search_table),
+                                    Selection.AppendErrors.SelectionFull => try error_message.setErrorMessage("Selection is full!", .search_table),
+                                }
                                 break :search_table;
                             };
                             const team = team_map.get(currently_selected_player.team_id.?) orelse @panic("Team not found in team map!");
@@ -445,6 +484,18 @@ pub fn main() !void {
             const message = cmd_input.buf.firstHalf();
             try command_helper.draw(win, message);
         }
+        // error messages
+        const err_msg_segment = vaxis.Cell.Segment{
+            .text = error_message.getMessage(),
+            .style = .{ .bold = true },
+        };
+        const err_msg_bar = win.child(.{
+            .x_off = 0,
+            .y_off = win.height - 2,
+            .width = win.width,
+            .height = 1,
+        });
+        _ = err_msg_bar.printSegment(err_msg_segment, .{});
 
         const tty_writer = tty_buf_writer.writer().any();
 
@@ -457,6 +508,8 @@ const Event = union(enum) {
     winsize: vaxis.Winsize,
     focus_in,
 };
+
+const ErrorMessage = @import("components/error_message.zig");
 
 const Player = @import("selection.zig").Player;
 
@@ -476,6 +529,8 @@ const LineupTable = @import("components/lineup_table.zig");
 const FixtureTable = @import("components/fixture_table.zig");
 
 const Selection = @import("selection.zig").Selection;
+
+const Menu = @import("components/menus.zig").Menu;
 
 const Team = @import("team.zig");
 const Match = Team.Match;
