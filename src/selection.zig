@@ -75,7 +75,7 @@ pub const Player = struct {
     }
 };
 
-pub const Lineup = struct {
+pub const Selection = struct {
     players: [15]?Player,
     lineup_value: f32,
     in_the_bank: f32,
@@ -83,8 +83,8 @@ pub const Lineup = struct {
     free_transfers: u8,
     hit_value: u8,
 
-    pub fn init() Lineup {
-        return Lineup{
+    pub fn init() Selection {
+        return Selection{
             .players = [_]?Player{null} ** 15,
             .lineup_value = 0,
             .in_the_bank = 0,
@@ -94,7 +94,7 @@ pub const Lineup = struct {
         };
     }
 
-    pub fn toString(self: Lineup, buf: *[15]Player) void {
+    pub fn toString(self: Selection, buf: *[15]Player) void {
         for (self.players, 0..) |player, i| {
             if (player) |pl| {
                 buf[i] = pl;
@@ -102,7 +102,7 @@ pub const Lineup = struct {
         }
     }
 
-    pub fn isValid(self: Lineup) bool {
+    pub fn isValid(self: Selection) bool {
         const MAX_PER_TEAM = 3;
         var gk_count: u4 = 0;
         var def_count: u4 = 0;
@@ -151,7 +151,7 @@ pub const Lineup = struct {
         return true;
     }
 
-    fn canAppend(self: Lineup, player: Player) bool {
+    fn canAppend(self: Selection, player: Player) bool {
         var player_count: u4 = 0;
         var has_inserted = false;
         var pseudo_lineup = self;
@@ -172,7 +172,7 @@ pub const Lineup = struct {
     }
 
     pub const AppendErrors = error{ SelectionFull, MissingFunds };
-    pub fn append(self: *Lineup, player: Player) AppendErrors!void {
+    pub fn append(self: *Selection, player: Player) AppendErrors!void {
         // check if we can append a player before appending
         // if not possible exit early
         if (!self.canAppend(player)) return error.SelectionFull;
@@ -190,7 +190,7 @@ pub const Lineup = struct {
     }
 
     /// Appends will not affect team and itb value
-    pub fn appendRaw(self: *Lineup, player: Player) error{SelectionFull}!void {
+    pub fn appendRaw(self: *Selection, player: Player) error{SelectionFull}!void {
         inline for (0..15) |i| {
             if (self.players[i] == null) {
                 self.players[i] = player;
@@ -200,7 +200,7 @@ pub const Lineup = struct {
         return error.SelectionFull;
     }
 
-    pub fn remove(self: *Lineup, index: u16) void {
+    pub fn remove(self: *Selection, index: u16) void {
         if (self.players[index]) |pl| {
             self.lineup_value -= pl.price.?;
             self.in_the_bank += pl.price.?;

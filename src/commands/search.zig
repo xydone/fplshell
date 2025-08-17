@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const Table = @import("../components/player_table.zig");
-const Player = @import("../lineup.zig").Player;
+const Player = @import("../selection.zig").Player;
 
 const CommandParams = @import("command.zig").Params;
 const Command = @import("command.zig");

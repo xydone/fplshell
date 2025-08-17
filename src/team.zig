@@ -27,14 +27,14 @@ const empty = Team{
     // .third_gw = null,
 };
 
-pub const TeamLineup = struct {
+pub const TeamList = struct {
     teams: [15]?Team,
-    pub fn init() TeamLineup {
-        return TeamLineup{
+    pub fn init() TeamList {
+        return TeamList{
             .teams = [_]?Team{null} ** 15,
         };
     }
-    pub fn toString(self: TeamLineup, buf: *[15]Team) void {
+    pub fn toString(self: TeamList, buf: *[15]Team) void {
         for (self.teams, 0..) |team, i| {
             if (team) |t| {
                 buf[i] = t;
@@ -43,7 +43,7 @@ pub const TeamLineup = struct {
     }
 
     pub const AppendErrors = error{SelectionFull};
-    pub fn appendAny(self: *TeamLineup, team: Team) AppendErrors!void {
+    pub fn appendAny(self: *TeamList, team: Team) AppendErrors!void {
         self.appendStarter(team) catch {
             // if we cannot append as a starter, append as bench
             // return SelectionFull if we cannot append as bench either
@@ -52,7 +52,7 @@ pub const TeamLineup = struct {
     }
 
     /// Does not check if lineup is valid.
-    pub fn appendStarter(self: *TeamLineup, team: Team) AppendErrors!void {
+    pub fn appendStarter(self: *TeamList, team: Team) AppendErrors!void {
         for (0..11) |i| {
             if (self.teams[i] == null) {
                 self.teams[i] = team;
@@ -63,7 +63,7 @@ pub const TeamLineup = struct {
     }
 
     /// Does not check if lineup is valid.
-    pub fn appendBench(self: *TeamLineup, team: Team) AppendErrors!void {
+    pub fn appendBench(self: *TeamList, team: Team) AppendErrors!void {
         for (11..15) |i| {
             if (self.teams[i] == null) {
                 self.teams[i] = team;
@@ -73,7 +73,7 @@ pub const TeamLineup = struct {
         return error.SelectionFull;
     }
 
-    pub fn remove(self: *TeamLineup, index: u16) void {
+    pub fn remove(self: *TeamList, index: u16) void {
         self.teams[index] = null;
     }
 };

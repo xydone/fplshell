@@ -14,8 +14,8 @@ const Color = vaxis.Cell.Color;
 pub const TableContext = Table.TableContext;
 const calcColWidth = Table.calcColWidth;
 
-const Player = @import("../lineup.zig").Player;
-const Lineup = @import("../lineup.zig").Lineup;
+const Player = @import("../selection.zig").Player;
+const Selection = @import("../selection.zig").Selection;
 const Colors = @import("../colors.zig");
 
 const TableCommon = @import("table_common.zig");
@@ -58,7 +58,7 @@ pub fn draw(
     allocator: Allocator,
     win: Window,
     table_win: Window,
-    lineup: Lineup,
+    lineup: Selection,
     bufs: struct {
         stats_buf: *[1024]u8,
         transfer_buf: *[1024]u8,
@@ -100,7 +100,7 @@ pub fn draw(
     try drawInner(allocator, table_win, list, self.table.context);
 }
 
-fn drawTeamValues(window: Window, buf: *[1024]u8, lineup: Lineup) !void {
+fn drawTeamValues(window: Window, buf: *[1024]u8, lineup: Selection) !void {
     const seg: vaxis.Cell.Segment = .{
         .text = try std.fmt.bufPrint(buf, "TV: {d:.1} | ITB: {d:.1}", .{
             lineup.lineup_value,
@@ -113,7 +113,7 @@ fn drawTeamValues(window: Window, buf: *[1024]u8, lineup: Lineup) !void {
     _ = window.printSegment(seg, .{});
 }
 
-fn drawTransfers(window: Window, buf: *[1024]u8, lineup: Lineup) !void {
+fn drawTransfers(window: Window, buf: *[1024]u8, lineup: Selection) !void {
     const seg: vaxis.Cell.Segment = .{
         .text = try std.fmt.bufPrint(buf, "FT: {} | TM: {} | Cost: {}", .{
             lineup.free_transfers,

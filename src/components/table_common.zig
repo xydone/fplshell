@@ -14,8 +14,8 @@ const Color = vaxis.Cell.Color;
 pub const TableContext = Table.TableContext;
 const calcColWidth = Table.calcColWidth;
 
-const Player = @import("../lineup.zig").Player;
-const Lineup = @import("../lineup.zig").Lineup;
+const Player = @import("../selection.zig").Player;
+const Selection = @import("../selection.zig").Selection;
 
 const Colors = @import("../colors.zig");
 

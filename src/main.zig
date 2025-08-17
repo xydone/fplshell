@@ -116,22 +116,22 @@ pub fn main() !void {
     }
 
     // read team data from config
-    var lineup: Lineup = .init();
-    var team_lineup: Team.TeamLineup = .init();
+    var selection: Selection = .init();
+    var team_list: Team.TeamList = .init();
     readTeam: {
-        // if team.json doesn't exist, leave lineup empty
+        // if team.json doesn't exist, leave selection empty
         const team_data = Config.getTeam(allocator) catch break :readTeam;
         defer team_data.deinit();
         for (team_data.value.picks) |pick| {
             const player = player_map.get(pick.element);
             if (player) |pl| {
-                try lineup.appendRaw(pl);
+                try selection.appendRaw(pl);
                 const team = team_map.get(pl.team_id.?) orelse @panic("Team not found in team map!");
-                try team_lineup.appendAny(team);
+                try team_list.appendAny(team);
             }
         }
-        lineup.in_the_bank = @floatFromInt(team_data.value.transfers.bank / 10);
-        lineup.lineup_value = @floatFromInt(team_data.value.transfers.value / 10);
+        selection.in_the_bank = @floatFromInt(team_data.value.transfers.bank / 10);
+        selection.lineup_value = @floatFromInt(team_data.value.transfers.value / 10);
     }
 
     var descriptions: [command_list.len]CommandDescription = undefined;
@@ -322,12 +322,12 @@ pub fn main() !void {
                     .search_table => search_table: {
                         const currently_selected_player = filtered_players.items[filtered.table.context.row];
                         if (key.matchExact(Key.enter, .{})) {
-                            lineup.append(currently_selected_player) catch {
+                            selection.append(currently_selected_player) catch {
                                 //TODO: signify selection full somehow?
                                 break :search_table;
                             };
                             const team = team_map.get(currently_selected_player.team_id.?) orelse @panic("Team not found in team map!");
-                            try team_lineup.appendAny(team);
+                            try team_list.appendAny(team);
                         } else if (key.matches(Key.right, .{})) {
                             active_menu = .selected;
                             selected.table.makeActive();
@@ -340,8 +340,8 @@ pub fn main() !void {
                             filtered.table.makeActive();
                             selected.table.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
-                            lineup.remove(selected.table.context.row);
-                            team_lineup.remove(selected.table.context.row);
+                            selection.remove(selected.table.context.row);
+                            team_list.remove(selected.table.context.row);
                         } else if (key.matchExact(Key.space, .{})) {
                             const rows = selected.table.context.sel_rows orelse {
                                 selected.table.context.sel_rows = try allocator.alloc(u16, 1);
@@ -356,8 +356,8 @@ pub fn main() !void {
                             if (selected.table.context.row == rows[0]) break :selected;
 
                             // if we are still here, swap them
-                            std.mem.swap(?Player, &lineup.players[selected.table.context.row], &lineup.players[rows[0]]);
-                            std.mem.swap(?Team, &team_lineup.teams[selected.table.context.row], &team_lineup.teams[rows[0]]);
+                            std.mem.swap(?Player, &selection.players[selected.table.context.row], &selection.players[rows[0]]);
+                            std.mem.swap(?Team, &team_list.teams[selected.table.context.row], &team_list.teams[rows[0]]);
                         }
                     },
                 }
@@ -390,7 +390,7 @@ pub fn main() !void {
             filtered_players,
         );
 
-        // lineup table
+        // selection table
         x_off += filtered_win.width + 2;
         const selected_win = win.child(.{
             .x_off = x_off,
@@ -406,7 +406,7 @@ pub fn main() !void {
             event_alloc,
             win,
             selected_win,
-            lineup,
+            selection,
             .{
                 .stats_buf = &stats_buf,
                 .transfer_buf = &transfer_buf,
@@ -422,7 +422,7 @@ pub fn main() !void {
             .height = ROWS_PER_TABLE + 2,
         });
         var team_buf: [15]Team = undefined;
-        team_lineup.toString(&team_buf);
+        team_list.toString(&team_buf);
         const fixtures = std.ArrayList(Team).fromOwnedSlice(allocator, &team_buf);
 
         try fixture_table.draw(
@@ -458,7 +458,7 @@ const Event = union(enum) {
     focus_in,
 };
 
-const Player = @import("lineup.zig").Player;
+const Player = @import("selection.zig").Player;
 
 const Config = @import("config.zig");
 
@@ -475,7 +475,7 @@ const PlayerTable = @import("components/player_table.zig");
 const LineupTable = @import("components/lineup_table.zig");
 const FixtureTable = @import("components/fixture_table.zig");
 
-const Lineup = @import("lineup.zig").Lineup;
+const Selection = @import("selection.zig").Selection;
 
 const Team = @import("team.zig");
 const Match = Team.Match;
