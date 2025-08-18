@@ -29,7 +29,7 @@ pub const Params = struct {
     allocator: Allocator,
 };
 
-pub const Errors = error{ EmptyStartToken, StartTokenNaN, EmptyEndToken, EndTokenNaN, InvalidRange };
+pub const Errors = error{ EmptyStartToken, StartTokenNaN, EmptyEndToken, EndTokenNaN };
 
 fn call(params: Params) Errors!void {
     const allocator = params.allocator;
@@ -41,7 +41,7 @@ fn call(params: Params) Errors!void {
     const end_token = it.next() orelse return error.EmptyEndToken;
     const end = std.fmt.parseInt(u8, end_token, 10) catch return error.EndTokenNaN;
 
-    fixture_table.setRange(allocator, start, end) catch return error.InvalidRange;
+    fixture_table.setRange(allocator, start, end);
 }
 
 pub fn handle(cmd: []const u8, params: Params) Errors!void {

@@ -1,10 +1,3 @@
-const std = @import("std");
-const Table = @import("../components/player_table.zig");
-const Player = @import("../selection.zig").Player;
-
-const CommandParams = @import("command.zig").Params;
-const Command = @import("command.zig");
-
 var COMMANDS = [_][]const u8{ "reset", "res" };
 
 pub const description = Command{
@@ -37,3 +30,11 @@ pub fn handle(cmd: []const u8, params: Params) Errors!void {
         try call(params);
     }
 }
+
+const Table = @import("../components/player_table.zig");
+const Player = @import("../types.zig").Player;
+
+const CommandParams = @import("command.zig").Params;
+const Command = @import("command.zig");
+
+const std = @import("std");

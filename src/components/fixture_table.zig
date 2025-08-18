@@ -1,24 +1,3 @@
-const std = @import("std");
-const fmt = std.fmt;
-const heap = std.heap;
-const mem = std.mem;
-const meta = std.meta;
-const Allocator = std.mem.Allocator;
-
-const TableCommon = @import("table_common.zig");
-const vaxis = @import("vaxis");
-const Window = vaxis.Window;
-const Segment = vaxis.Cell.Segment;
-const VaxisTable = vaxis.widgets.Table;
-const Color = vaxis.Cell.Color;
-
-const Team = @import("../team.zig");
-
-pub const TableContext = VaxisTable.TableContext;
-
-const calcColWidth = VaxisTable.calcColWidth;
-
-const Colors = @import("../colors.zig");
 const active_row = TableCommon.active_row;
 const selected_row = TableCommon.selected_row;
 const selected_table = TableCommon.selected_table;
@@ -31,15 +10,19 @@ end_index: u8,
 
 const Self = @This();
 
+/// Clamps to valid gameweeks
 pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
-    const gameweek_count = last_gw - first_gw + 1;
+    const first = @max(first_gw, 1);
+    const last = @min(last_gw, GAMEWEEK_COUNT);
+    const gameweek_count = last - first + 1;
+
     const context = try allocator.create(TableContext);
 
     const header_names = try allocator.create(std.ArrayListUnmanaged([]u8));
     header_names.* = try std.ArrayListUnmanaged([]u8).initCapacity(allocator, gameweek_count);
 
     for (0..gameweek_count) |i| {
-        header_names.appendAssumeCapacity(try std.fmt.allocPrint(allocator, "GW{}", .{i + 1}));
+        header_names.appendAssumeCapacity(try std.fmt.allocPrint(allocator, "GW{}", .{first + i}));
     }
 
     context.* = .{
@@ -58,8 +41,8 @@ pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
     return Self{
         .table = table,
         .header_names = header_names,
-        .start_index = first_gw,
-        .end_index = last_gw,
+        .start_index = first,
+        .end_index = last,
     };
 }
 
@@ -77,18 +60,18 @@ fn updateHeaders(self: *Self, allocator: Allocator, range_start: u8, range_end: 
     self.table.context.header_names = .{ .custom = self.header_names.items };
 }
 
-const SetRangeErrors = error{InvalidRange};
 /// Changes the fixture gameweek range, if there's a null start/end value, it remains the same.
-pub fn setRange(self: *Self, allocator: Allocator, start_index: ?u8, end_index: ?u8) SetRangeErrors!void {
+///
+/// Clamps to valid values.
+pub fn setRange(self: *Self, allocator: Allocator, start_index: ?u8, end_index: ?u8) void {
     const LOWER_BOUND = 1;
-    const UPPER_BOUND = 38;
-    const range = (end_index orelse self.end_index) - (start_index orelse self.start_index);
+    const UPPER_BOUND = GAMEWEEK_COUNT;
+
     if (start_index) |idx| {
-        if (idx < LOWER_BOUND or idx > UPPER_BOUND - range) return error.InvalidRange;
-        self.start_index = idx;
+        self.start_index = @max(idx, LOWER_BOUND);
     }
     if (end_index) |idx| {
-        self.end_index = idx;
+        self.end_index = @min(idx, UPPER_BOUND);
     }
 
     self.updateHeaders(allocator, self.start_index, self.end_index) catch @panic("OOM");
@@ -290,3 +273,26 @@ fn drawInner(
         }
     }
 }
+
+const GAMEWEEK_COUNT = @import("../types.zig").GAMEWEEK_COUNT;
+
+pub const TableContext = VaxisTable.TableContext;
+
+const calcColWidth = VaxisTable.calcColWidth;
+const TableCommon = @import("table_common.zig");
+const Window = vaxis.Window;
+const Segment = vaxis.Cell.Segment;
+const VaxisTable = vaxis.widgets.Table;
+const Color = vaxis.Cell.Color;
+const vaxis = @import("vaxis");
+
+const Team = @import("../team.zig");
+
+const Colors = @import("../colors.zig");
+
+const fmt = std.fmt;
+const heap = std.heap;
+const mem = std.mem;
+const meta = std.meta;
+const Allocator = std.mem.Allocator;
+const std = @import("std");

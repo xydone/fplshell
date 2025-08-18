@@ -90,7 +90,11 @@ pub const GetStatic = struct {
     pub const Response = struct {
         teams: []Team,
         elements: []Element,
+        events: []Event,
 
+        const Event = struct {
+            is_next: bool,
+        };
         const Team = struct {
             id: u32,
             name: []const u8,

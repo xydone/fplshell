@@ -1,25 +1,3 @@
-const std = @import("std");
-const fmt = std.fmt;
-const heap = std.heap;
-const mem = std.mem;
-const meta = std.meta;
-const Allocator = std.mem.Allocator;
-
-const vaxis = @import("vaxis");
-const Window = vaxis.Window;
-const Segment = vaxis.Cell.Segment;
-const Table = vaxis.widgets.Table;
-const Color = vaxis.Cell.Color;
-
-pub const TableContext = Table.TableContext;
-const calcColWidth = Table.calcColWidth;
-
-const Player = @import("../selection.zig").Player;
-const Selection = @import("../selection.zig").Selection;
-const Colors = @import("../colors.zig");
-
-const TableCommon = @import("table_common.zig");
-
 table: TableCommon,
 
 const Self = @This();
@@ -256,3 +234,25 @@ fn drawInner(
         }
     }
 }
+
+const vaxis = @import("vaxis");
+const Window = vaxis.Window;
+const Segment = vaxis.Cell.Segment;
+const Table = vaxis.widgets.Table;
+const Color = vaxis.Cell.Color;
+
+pub const TableContext = Table.TableContext;
+const calcColWidth = Table.calcColWidth;
+
+const Player = @import("../types.zig").Player;
+const GameweekSelection = @import("../gameweek_selection.zig");
+const Colors = @import("../colors.zig");
+
+const TableCommon = @import("table_common.zig");
+
+const fmt = std.fmt;
+const heap = std.heap;
+const mem = std.mem;
+const meta = std.meta;
+const Allocator = std.mem.Allocator;
+const std = @import("std");

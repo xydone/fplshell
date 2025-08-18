@@ -58,8 +58,8 @@ pub fn handle(cmd: []const u8, params: Params) Errors!void {
 const enumToString = @import("../util/enumToString.zig").enumToString;
 
 const Table = @import("../components/player_table.zig");
-const Player = @import("../selection.zig").Player;
 const Position = Player.Position;
+const Player = @import("../types.zig").Player;
 
 const CommandParams = @import("command.zig").Params;
 const Command = @import("command.zig");

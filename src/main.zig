@@ -36,6 +36,13 @@ pub fn main() !void {
         try team_name_map.put(allocator, team.id, .{ .full = team.name, .short = team.short_name });
     }
 
+    const next_gw: u8 = blk: {
+        for (static_data.value.events, 0..) |event, i| {
+            if (event.is_next == true) break :blk @intCast(i);
+        }
+        @panic("Cannot find next gameweek!");
+    };
+
     var all_players = std.ArrayList(Player).init(allocator);
     defer all_players.deinit();
 
@@ -109,10 +116,13 @@ pub fn main() !void {
     }
 
     // read team data from config
-    var selection: Selection = .init();
+    var season_selections: SeasonSelection = .init();
+    season_selections.active_idx = next_gw;
+
     var team_list: Team.TeamList = .init();
     readTeam: {
-        // if team.json doesn't exist, leave selection empty
+        var selection: GameweekSelection = .init();
+        // if team.json doesn't exist, leave gw_selection empty
         const team_data = Config.getTeam(allocator) catch break :readTeam;
         defer team_data.deinit();
         for (team_data.value.picks) |pick| {
@@ -125,6 +135,10 @@ pub fn main() !void {
         }
         selection.in_the_bank = @floatFromInt(team_data.value.transfers.bank / 10);
         selection.lineup_value = @floatFromInt(team_data.value.transfers.value / 10);
+        selection.free_transfers = @intCast(team_data.value.transfers.limit orelse 0);
+
+        season_selections.insertGameweek(selection, next_gw);
+        season_selections.active_idx = next_gw;
     }
 
     var descriptions: [command_list.len]CommandDescription = undefined;
@@ -173,7 +187,8 @@ pub fn main() !void {
     var selected = try LineupTable.init(allocator, "Selected players");
     defer selected.deinit(allocator);
 
-    var fixture_table = try FixtureTable.init(allocator, 1, 5);
+    // in the beginning, start it at the current active gameweek
+    var fixture_table: FixtureTable = try .init(allocator, next_gw + 1, next_gw + 1 + 5);
     defer fixture_table.deinit(allocator);
 
     var active_menu: Menu = .search_table;
@@ -182,6 +197,8 @@ pub fn main() !void {
 
     var error_message: ErrorMessage = try .init(allocator, &previous_menu, &active_menu);
     defer error_message.deinit(allocator);
+
+    var gw_selection = season_selections.gameweek_selections[season_selections.active_idx];
 
     while (true) {
         defer _ = event_arena.reset(.retain_capacity);
@@ -232,14 +249,23 @@ pub fn main() !void {
                 switch (active_menu) {
                     .error_message => {},
                     .gameweek_selector => {
+                        //TODO: known issue, you can decrease the range of the fixture table to the minimum (1) if you reach the start and then continue clicking left arrow
                         if (key.matchExact(Key.left, .{})) {
+                            // move gameweek selection
+                            season_selections.active_idx -|= 1;
+                            gw_selection = season_selections.gameweek_selections[season_selections.active_idx];
+                            // move fixtures
                             const start = fixture_table.start_index - 1;
                             const end = fixture_table.end_index - 1;
-                            try fixture_table.setRange(allocator, start, end);
+                            fixture_table.setRange(allocator, start, end);
                         } else if (key.matches(Key.right, .{})) {
+                            // move gameweek selection
+                            season_selections.active_idx +|= 1;
+                            gw_selection = season_selections.gameweek_selections[season_selections.active_idx];
+                            // move fixtures
                             const start = fixture_table.start_index + 1;
                             const end = fixture_table.end_index + 1;
-                            try fixture_table.setRange(allocator, start, end);
+                            fixture_table.setRange(allocator, start, end);
                         }
                     },
                     .cmd => cmd: {
@@ -338,9 +364,6 @@ pub fn main() !void {
                                                 .it = &it,
                                             }) catch |err| switch (err) {
                                                 Horizon.Errors.EmptyEndToken, Horizon.Errors.EmptyStartToken => {},
-                                                Horizon.Errors.InvalidRange => {
-                                                    try error_message.setErrorMessage("You must enter a valid range!", .cmd);
-                                                },
                                                 Horizon.Errors.StartTokenNaN, Horizon.Errors.EndTokenNaN => {
                                                     try error_message.setErrorMessage("You must enter a number!", .cmd);
                                                 },
@@ -358,10 +381,10 @@ pub fn main() !void {
                     .search_table => search_table: {
                         const currently_selected_player = filtered_players.items[filtered.table.context.row];
                         if (key.matchExact(Key.enter, .{})) {
-                            selection.append(currently_selected_player) catch |err| {
+                            gw_selection.append(currently_selected_player) catch |err| {
                                 switch (err) {
-                                    Selection.AppendErrors.MissingFunds => try error_message.setErrorMessage("Insufficient funds!", .search_table),
-                                    Selection.AppendErrors.SelectionFull => try error_message.setErrorMessage("Selection is full!", .search_table),
+                                    GameweekSelection.AppendErrors.MissingFunds => try error_message.setErrorMessage("Insufficient funds!", .search_table),
+                                    GameweekSelection.AppendErrors.SelectionFull => try error_message.setErrorMessage("GameweekSelection is full!", .search_table),
                                 }
                                 break :search_table;
                             };
@@ -379,7 +402,7 @@ pub fn main() !void {
                             filtered.table.makeActive();
                             selected.table.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
-                            selection.remove(selected.table.context.row);
+                            gw_selection.remove(selected.table.context.row);
                             team_list.remove(selected.table.context.row);
                         } else if (key.matchExact(Key.space, .{})) {
                             const rows = selected.table.context.sel_rows orelse {
@@ -395,7 +418,7 @@ pub fn main() !void {
                             if (selected.table.context.row == rows[0]) break :selected;
 
                             // if we are still here, swap them
-                            std.mem.swap(?Player, &selection.players[selected.table.context.row], &selection.players[rows[0]]);
+                            std.mem.swap(?Player, &gw_selection.players[selected.table.context.row], &gw_selection.players[rows[0]]);
                             std.mem.swap(?Team, &team_list.teams[selected.table.context.row], &team_list.teams[rows[0]]);
                         }
                     },
@@ -429,7 +452,7 @@ pub fn main() !void {
             filtered_players,
         );
 
-        // selection table
+        // gw_selection table
         x_off += filtered_win.width + 2;
         const selected_win = win.child(.{
             .x_off = x_off,
@@ -445,7 +468,7 @@ pub fn main() !void {
             event_alloc,
             win,
             selected_win,
-            selection,
+            gw_selection,
             .{
                 .stats_buf = &stats_buf,
                 .transfer_buf = &transfer_buf,
@@ -511,7 +534,7 @@ const Event = union(enum) {
 
 const ErrorMessage = @import("components/error_message.zig");
 
-const Player = @import("selection.zig").Player;
+const Player = @import("types.zig").Player;
 
 const Config = @import("config.zig");
 
@@ -528,7 +551,9 @@ const PlayerTable = @import("components/player_table.zig");
 const LineupTable = @import("components/lineup_table.zig");
 const FixtureTable = @import("components/fixture_table.zig");
 
-const Selection = @import("selection.zig").Selection;
+const SeasonSelection = @import("season_selection.zig");
+
+const GameweekSelection = @import("gameweek_selection.zig");
 
 const Menu = @import("components/menus.zig").Menu;
 

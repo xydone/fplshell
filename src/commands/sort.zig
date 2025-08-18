@@ -1,12 +1,3 @@
-const std = @import("std");
-const Table = @import("../components/player_table.zig");
-const Player = @import("../selection.zig").Player;
-
-const CommandParams = @import("command.zig").Params;
-const Command = @import("command.zig");
-
-const enumToString = @import("../util/enumToString.zig").enumToString;
-
 const SortTypes = enum { desc, asc };
 
 var COMMANDS = [_][]const u8{"sort"};
@@ -67,3 +58,13 @@ pub fn handle(cmd: []const u8, params: Params) Errors!void {
         try call(params);
     }
 }
+
+const Table = @import("../components/player_table.zig");
+const Player = @import("../types.zig").Player;
+
+const CommandParams = @import("command.zig").Params;
+const Command = @import("command.zig");
+
+const enumToString = @import("../util/enumToString.zig").enumToString;
+
+const std = @import("std");
