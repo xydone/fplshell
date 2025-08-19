@@ -527,6 +527,19 @@ const Event = union(enum) {
     focus_in,
 };
 
+pub fn panic(
+    msg: []const u8,
+    error_return_trace: ?*std.builtin.StackTrace,
+    ret_addr: ?usize,
+) noreturn {
+    vaxis.recover();
+    std.log.err("{s}\n\n", .{msg});
+    if (error_return_trace) |t| std.debug.dumpStackTrace(t.*);
+    std.debug.dumpCurrentStackTrace(ret_addr orelse @returnAddress());
+
+    std.process.exit(1);
+}
+
 const ErrorMessage = @import("components/error_message.zig");
 
 const Player = @import("types.zig").Player;
