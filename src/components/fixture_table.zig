@@ -47,6 +47,7 @@ pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
 }
 
 fn updateHeaders(self: *Self, allocator: Allocator, range_start: u8, range_end: u8) !void {
+    std.debug.assert(range_start <= range_end);
     // free existing headers
     for (0..self.header_names.items.len) |i| {
         allocator.free(self.header_names.items[i]);
@@ -68,13 +69,17 @@ pub fn setRange(self: *Self, allocator: Allocator, start_index: ?u8, end_index: 
     const UPPER_BOUND = GAMEWEEK_COUNT;
 
     if (start_index) |idx| {
-        self.start_index = @max(idx, LOWER_BOUND);
+        self.start_index = @min(@max(idx, LOWER_BOUND), UPPER_BOUND);
     }
     if (end_index) |idx| {
-        self.end_index = @min(idx, UPPER_BOUND);
+        self.end_index = @min(@max(idx, LOWER_BOUND), UPPER_BOUND);
     }
 
     self.updateHeaders(allocator, self.start_index, self.end_index) catch @panic("OOM");
+}
+
+pub fn decreaseRange(self: *Self, allocator: Allocator, amount: u8) void {
+    self.setRange(allocator, self.start_index - amount, self.end_index - amount);
 }
 
 pub fn deinit(self: Self, allocator: Allocator) void {
@@ -296,3 +301,140 @@ const mem = std.mem;
 const meta = std.meta;
 const Allocator = std.mem.Allocator;
 const std = @import("std");
+
+test "Component | Fixture Table" {
+    const test_name = "Component | Fixture Table";
+    const Benchmark = @import("../test_runner.zig").Benchmark;
+    const allocator = std.testing.allocator;
+
+    var benchmark = Benchmark.start(test_name);
+    defer benchmark.end();
+
+    const first_gw = 1;
+    const last_gw = 10;
+
+    const fixture_table: Self = try .init(allocator, first_gw, last_gw);
+    defer fixture_table.deinit(allocator);
+
+    var buf: [4]u8 = undefined;
+
+    std.testing.expectEqual(last_gw - first_gw + 1, fixture_table.header_names.items.len) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+    std.testing.expectEqual(first_gw, fixture_table.start_index) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+    std.testing.expectEqual(last_gw, fixture_table.end_index) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+    for (fixture_table.header_names.items, 1..) |fixture_gw, i| {
+        const gw = try std.fmt.bufPrint(&buf, "GW{d}", .{i});
+        std.testing.expectEqualSlices(u8, gw, fixture_gw) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+    }
+}
+
+test "Component | Fixture Table - Update Headers" {
+    const test_name = "Component | Fixture Table - Update Headers";
+    const Benchmark = @import("../test_runner.zig").Benchmark;
+    const allocator = std.testing.allocator;
+
+    const first_gw = 1;
+    const last_gw = 10;
+
+    var fixture_table: Self = try .init(allocator, first_gw, last_gw);
+    defer fixture_table.deinit(allocator);
+
+    var benchmark = Benchmark.start(test_name);
+    defer benchmark.end();
+
+    const new_first_gw = 2;
+    const new_last_gw = 8;
+
+    fixture_table.updateHeaders(allocator, new_first_gw, new_last_gw) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+
+    var buf: [4]u8 = undefined;
+    for (fixture_table.header_names.items, new_first_gw..) |fixture_gw, i| {
+        const gw = try std.fmt.bufPrint(&buf, "GW{d}", .{i});
+        std.testing.expectEqualSlices(u8, gw, fixture_gw) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+    }
+}
+
+test "Component | Fixture Table - Set Range" {
+    const test_name = "Component | Fixture Table - Set Range";
+    const Benchmark = @import("../test_runner.zig").Benchmark;
+    const allocator = std.testing.allocator;
+
+    const first_gw = 1;
+    const last_gw = 10;
+
+    var fixture_table: Self = try .init(allocator, first_gw, last_gw);
+    defer fixture_table.deinit(allocator);
+
+    var benchmark = Benchmark.start(test_name);
+    defer benchmark.end();
+
+    const new_first_gw = 2;
+    const new_last_gw = 8;
+
+    fixture_table.setRange(allocator, new_first_gw, new_last_gw);
+
+    std.testing.expectEqual(new_first_gw, fixture_table.start_index) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+    std.testing.expectEqual(new_last_gw, fixture_table.end_index) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+
+    var buf: [4]u8 = undefined;
+    for (fixture_table.header_names.items, new_first_gw..) |fixture_gw, i| {
+        const gw = try std.fmt.bufPrint(&buf, "GW{d}", .{i});
+        std.testing.expectEqualSlices(u8, gw, fixture_gw) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+    }
+}
+
+test "Component | Fixture Table - Set Range (clamps)" {
+    const test_name = "Component | Fixture Table - Set Range (invalid range)";
+    const Benchmark = @import("../test_runner.zig").Benchmark;
+    const allocator = std.testing.allocator;
+
+    const first_gw = 1;
+    const last_gw = 10;
+
+    var fixture_table: Self = try .init(allocator, first_gw, last_gw);
+    defer fixture_table.deinit(allocator);
+
+    var benchmark = Benchmark.start(test_name);
+    defer benchmark.end();
+
+    const new_first_gw = 0; // will clamp to min value (1)
+    const new_last_gw = 50; // will clamp to max value (GAMEWEEK_COUNT)
+
+    fixture_table.setRange(allocator, new_first_gw, new_last_gw);
+
+    std.testing.expectEqual(1, fixture_table.start_index) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+    // check if clamps
+    std.testing.expectEqual(GAMEWEEK_COUNT, fixture_table.end_index) catch |err| {
+        benchmark.fail(err);
+        return err;
+    };
+}

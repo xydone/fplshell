@@ -249,15 +249,15 @@ pub fn main() !void {
                 switch (active_menu) {
                     .error_message => {},
                     .gameweek_selector => {
-                        //TODO: known issue, you can decrease the range of the fixture table to the minimum (1) if you reach the start and then continue clicking left arrow
                         if (key.matchExact(Key.left, .{})) {
                             // move gameweek selection
                             season_selections.active_idx -|= 1;
                             gw_selection = season_selections.gameweek_selections[season_selections.active_idx];
                             // move fixtures
-                            const start = fixture_table.start_index - 1;
-                            const end = fixture_table.end_index - 1;
-                            fixture_table.setRange(allocator, start, end);
+                            // const start: u8 = fixture_table.start_index -| 1;
+                            // const end: u8 = fixture_table.end_index -| 1;
+                            // fixture_table.setRange(allocator, start, end);
+                            fixture_table.decreaseRange(allocator, 1);
                         } else if (key.matches(Key.right, .{})) {
                             // move gameweek selection
                             season_selections.active_idx +|= 1;
