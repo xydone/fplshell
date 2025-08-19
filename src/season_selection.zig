@@ -13,11 +13,11 @@ pub fn init() Self {
 }
 
 pub fn incrementIndex(self: *Self, amount: u8) void {
-    self.active_idx -|= std.math.clamp(self.active_idx + amount, 1, GAMEWEEK_COUNT);
+    self.active_idx = std.math.clamp(self.active_idx + amount, 0, GAMEWEEK_COUNT);
 }
 
 pub fn decrementIndex(self: *Self, amount: u8) void {
-    self.active_idx -|= std.math.clamp(self.active_idx + amount, 1, GAMEWEEK_COUNT);
+    self.active_idx = std.math.clamp(self.active_idx -| amount, 0, GAMEWEEK_COUNT);
 }
 
 pub fn getActiveGameweek(self: Self) GameweekSelection {
