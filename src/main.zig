@@ -116,11 +116,13 @@ pub fn main() !void {
     }
 
     // read team data from config
-    var season_selections: SeasonSelection = .init();
+    var season_selections: SeasonSelection = try .init(allocator, 5);
+    defer season_selections.deinit(allocator);
+
     season_selections.active_idx = next_gw;
 
-    var team_list: Team.TeamList = .init();
     readTeam: {
+        var team_list: Team.TeamList = .init();
         var selection: GameweekSelection = .init();
         // if team.json doesn't exist, leave gw_selection empty
         const team_data = Config.getTeam(allocator) catch break :readTeam;
@@ -139,6 +141,8 @@ pub fn main() !void {
 
         season_selections.insertGameweek(selection, next_gw);
         season_selections.active_idx = next_gw;
+
+        season_selections.fixture_table[season_selections.active_idx].team_list = team_list;
     }
 
     var descriptions: [command_list.len]CommandDescription = undefined;
@@ -187,10 +191,6 @@ pub fn main() !void {
     var selected = try LineupTable.init(allocator, "Selected players");
     defer selected.deinit(allocator);
 
-    // in the beginning, start it at the current active gameweek
-    var fixture_table: FixtureTable = try .init(allocator, next_gw + 1, next_gw + 1 + 5);
-    defer fixture_table.deinit(allocator);
-
     var active_menu: Menu = .search_table;
     // Used for smooth transitioning in and out of the gameweek selector menu
     var previous_menu: Menu = active_menu;
@@ -198,7 +198,8 @@ pub fn main() !void {
     var error_message: ErrorMessage = try .init(allocator, &previous_menu, &active_menu);
     defer error_message.deinit(allocator);
 
-    var gw_selection = season_selections.gameweek_selections[season_selections.active_idx];
+    var gw_selection: GameweekSelection = season_selections.gameweek_selections[season_selections.active_idx];
+    var fixture_table: FixtureTable = season_selections.fixture_table[season_selections.active_idx];
 
     while (true) {
         defer _ = event_arena.reset(.retain_capacity);
@@ -250,17 +251,15 @@ pub fn main() !void {
                     .error_message => {},
                     .gameweek_selector => {
                         if (key.matchExact(Key.left, .{})) {
-                            // move gameweek selection
                             season_selections.decrementIndex(1);
+
                             gw_selection = season_selections.getActiveGameweek();
-                            // move fixtures
-                            fixture_table.decrementRange(allocator, 1);
+                            fixture_table = season_selections.getActiveFixture();
                         } else if (key.matches(Key.right, .{})) {
-                            // move gameweek selection
                             season_selections.incrementIndex(1);
+
                             gw_selection = season_selections.getActiveGameweek();
-                            // move fixtures
-                            fixture_table.incrementRange(allocator, 1);
+                            fixture_table = season_selections.getActiveFixture();
                         }
                     },
                     .cmd => cmd: {
@@ -384,7 +383,7 @@ pub fn main() !void {
                                 break :search_table;
                             };
                             const team = team_map.get(currently_selected_player.team_id.?) orelse @panic("Team not found in team map!");
-                            try team_list.appendAny(team);
+                            try fixture_table.team_list.appendAny(team);
                         } else if (key.matches(Key.right, .{})) {
                             active_menu = .selected;
                             selected.table.makeActive();
@@ -398,7 +397,7 @@ pub fn main() !void {
                             selected.table.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
                             gw_selection.remove(selected.table.context.row);
-                            team_list.remove(selected.table.context.row);
+                            fixture_table.team_list.remove(selected.table.context.row);
                         } else if (key.matchExact(Key.space, .{})) {
                             const rows = selected.table.context.sel_rows orelse {
                                 selected.table.context.sel_rows = try allocator.alloc(u16, 1);
@@ -414,7 +413,11 @@ pub fn main() !void {
 
                             // if we are still here, swap them
                             std.mem.swap(?Player, &gw_selection.players[selected.table.context.row], &gw_selection.players[rows[0]]);
-                            std.mem.swap(?Team, &team_list.teams[selected.table.context.row], &team_list.teams[rows[0]]);
+                            std.mem.swap(
+                                ?Team,
+                                &fixture_table.team_list.teams[selected.table.context.row],
+                                &fixture_table.team_list.teams[rows[0]],
+                            );
                         }
                     },
                 }
@@ -479,7 +482,8 @@ pub fn main() !void {
             .height = ROWS_PER_TABLE + 2,
         });
         var team_buf: [15]Team = undefined;
-        team_list.toString(&team_buf);
+
+        season_selections.fixture_table[season_selections.active_idx].team_list.toString(&team_buf);
         const fixtures = std.ArrayList(Team).fromOwnedSlice(allocator, &team_buf);
 
         try fixture_table.draw(
