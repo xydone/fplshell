@@ -61,25 +61,27 @@ fn updateHeaders(self: *Self, allocator: Allocator, range_start: u8, range_end: 
     self.table.context.header_names = .{ .custom = self.header_names.items };
 }
 
-/// Changes the fixture gameweek range, if there's a null start/end value, it remains the same.
-///
 /// Clamps to valid values.
-pub fn setRange(self: *Self, allocator: Allocator, start_index: ?u8, end_index: ?u8) void {
+pub fn setRange(self: *Self, allocator: Allocator, start_index: u8, end_index: u8) void {
     const LOWER_BOUND = 1;
     const UPPER_BOUND = GAMEWEEK_COUNT;
 
-    if (start_index) |idx| {
-        self.start_index = @min(@max(idx, LOWER_BOUND), UPPER_BOUND);
-    }
-    if (end_index) |idx| {
-        self.end_index = @min(@max(idx, LOWER_BOUND), UPPER_BOUND);
-    }
+    const start = std.math.clamp(start_index, LOWER_BOUND, UPPER_BOUND);
+    self.start_index = start;
+    const end = std.math.clamp(end_index, LOWER_BOUND, UPPER_BOUND);
+    self.end_index = end;
 
-    self.updateHeaders(allocator, self.start_index, self.end_index) catch @panic("OOM");
+    self.updateHeaders(allocator, start, end) catch @panic("OOM");
 }
 
-pub fn decreaseRange(self: *Self, allocator: Allocator, amount: u8) void {
+/// Clamps to valid values.
+pub fn decrementRange(self: *Self, allocator: Allocator, amount: u8) void {
     self.setRange(allocator, self.start_index - amount, self.end_index - amount);
+}
+
+/// Clamps to valid values.
+pub fn incrementRange(self: *Self, allocator: Allocator, amount: u8) void {
+    self.setRange(allocator, self.start_index + amount, self.end_index + amount);
 }
 
 pub fn deinit(self: Self, allocator: Allocator) void {

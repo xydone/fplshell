@@ -251,21 +251,16 @@ pub fn main() !void {
                     .gameweek_selector => {
                         if (key.matchExact(Key.left, .{})) {
                             // move gameweek selection
-                            season_selections.active_idx -|= 1;
-                            gw_selection = season_selections.gameweek_selections[season_selections.active_idx];
+                            season_selections.decrementIndex(1);
+                            gw_selection = season_selections.getActiveGameweek();
                             // move fixtures
-                            // const start: u8 = fixture_table.start_index -| 1;
-                            // const end: u8 = fixture_table.end_index -| 1;
-                            // fixture_table.setRange(allocator, start, end);
-                            fixture_table.decreaseRange(allocator, 1);
+                            fixture_table.decrementRange(allocator, 1);
                         } else if (key.matches(Key.right, .{})) {
                             // move gameweek selection
-                            season_selections.active_idx +|= 1;
-                            gw_selection = season_selections.gameweek_selections[season_selections.active_idx];
+                            season_selections.incrementIndex(1);
+                            gw_selection = season_selections.getActiveGameweek();
                             // move fixtures
-                            const start = fixture_table.start_index + 1;
-                            const end = fixture_table.end_index + 1;
-                            fixture_table.setRange(allocator, start, end);
+                            fixture_table.incrementRange(allocator, 1);
                         }
                     },
                     .cmd => cmd: {
