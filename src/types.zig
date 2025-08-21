@@ -6,6 +6,7 @@ pub const Player = struct {
     team_name: ?[]const u8,
     price: ?f32,
     // below are fields that will not be displayed on the table
+    id: ?u32,
     team_id: ?u32,
     position: ?Position,
     background_color: ?Color,
@@ -63,6 +64,7 @@ pub const Player = struct {
         }
     };
     pub const empty: Player = .{
+        .id = null,
         .position_name = null,
         .name = null,
         .team_name = null,

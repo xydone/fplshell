@@ -44,6 +44,13 @@ pub fn insertGameweek(self: *Self, gw_selection: GameweekSelection, gw_num: u8) 
     self.gameweek_selections[gw_num] = gw_selection;
 }
 
+pub fn removePlayer(self: *Self, index: u32) void {
+    const player = self.gameweek_selections[self.active_idx].players[index] orelse return;
+    for (self.gameweek_selections[self.active_idx..]) |*gameweek| {
+        gameweek.remove(player.id.?);
+    }
+}
+
 const FixtureTable = @import("components/fixture_table.zig");
 
 const GAMEWEEK_COUNT = @import("types.zig").GAMEWEEK_COUNT;

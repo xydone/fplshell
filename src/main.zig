@@ -101,6 +101,7 @@ pub fn main() !void {
         const names = team_name_map.get(element.team) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team});
         const bg = Teams.fromString(names.full).color();
         const player = Player{
+            .id = element.id,
             .name = element.web_name,
             .position = Player.Position.fromElementType(element.element_type),
             .position_name = Player.fromElementType(element.element_type),
@@ -139,10 +140,11 @@ pub fn main() !void {
         selection.lineup_value = @floatFromInt(team_data.value.transfers.value / 10);
         selection.free_transfers = @intCast(team_data.value.transfers.limit orelse 0);
 
-        season_selections.insertGameweek(selection, next_gw);
         season_selections.active_idx = next_gw;
 
-        season_selections.fixture_table[season_selections.active_idx].team_list = team_list;
+        for (next_gw..GAMEWEEK_COUNT) |i| {
+            season_selections.insertGameweek(selection, @intCast(i));
+        }
     }
 
     var descriptions: [command_list.len]CommandDescription = undefined;
@@ -382,8 +384,6 @@ pub fn main() !void {
                                 }
                                 break :search_table;
                             };
-                            const team = team_map.get(currently_selected_player.team_id.?) orelse @panic("Team not found in team map!");
-                            try fixture_table.team_list.appendAny(team);
                         } else if (key.matches(Key.right, .{})) {
                             active_menu = .selected;
                             selected.table.makeActive();
@@ -396,8 +396,10 @@ pub fn main() !void {
                             filtered.table.makeActive();
                             selected.table.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
-                            gw_selection.remove(selected.table.context.row);
-                            fixture_table.team_list.remove(selected.table.context.row);
+                            season_selections.removePlayer(selected.table.context.row);
+
+                            // update display
+                            gw_selection = season_selections.getActiveGameweek();
                         } else if (key.matchExact(Key.space, .{})) {
                             const rows = selected.table.context.sel_rows orelse {
                                 selected.table.context.sel_rows = try allocator.alloc(u16, 1);
@@ -412,12 +414,14 @@ pub fn main() !void {
                             if (selected.table.context.row == rows[0]) break :selected;
 
                             // if we are still here, swap them
-                            std.mem.swap(?Player, &gw_selection.players[selected.table.context.row], &gw_selection.players[rows[0]]);
                             std.mem.swap(
-                                ?Team,
-                                &fixture_table.team_list.teams[selected.table.context.row],
-                                &fixture_table.team_list.teams[rows[0]],
+                                ?Player,
+                                &season_selections.gameweek_selections[season_selections.active_idx].players[selected.table.context.row],
+                                &season_selections.gameweek_selections[season_selections.active_idx].players[rows[0]],
                             );
+
+                            // update global to new state
+                            gw_selection = season_selections.getActiveGameweek();
                         }
                     },
                 }
@@ -483,7 +487,15 @@ pub fn main() !void {
         });
         var team_buf: [15]Team = undefined;
 
-        season_selections.fixture_table[season_selections.active_idx].team_list.toString(&team_buf);
+        var team_list = Team.TeamList.init();
+
+        for (gw_selection.players, 0..) |maybe_pl, i| {
+            const player = maybe_pl orelse continue;
+            const team = team_map.get(player.team_id.?) orelse @panic("Team not found in team map!");
+            team_list.teams[i] = team;
+        }
+        team_list.toString(&team_buf);
+
         const fixtures = std.ArrayList(Team).fromOwnedSlice(allocator, &team_buf);
 
         try fixture_table.draw(
@@ -546,6 +558,7 @@ pub fn panic(
 
 const ErrorMessage = @import("components/error_message.zig");
 
+const GAMEWEEK_COUNT = @import("types.zig").GAMEWEEK_COUNT;
 const Player = @import("types.zig").Player;
 
 const Config = @import("config.zig");

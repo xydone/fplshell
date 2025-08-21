@@ -7,7 +7,6 @@ table: TableCommon,
 header_names: *std.ArrayListUnmanaged([]u8),
 start_index: u8,
 end_index: u8,
-team_list: TeamList,
 
 const Self = @This();
 
@@ -43,7 +42,6 @@ pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
         .header_names = header_names,
         .start_index = first,
         .end_index = last,
-        .team_list = .init(),
     };
 }
 
@@ -74,16 +72,6 @@ pub fn setRange(self: *Self, allocator: Allocator, start_index: u8, end_index: u
 
     self.updateHeaders(allocator, start, end) catch @panic("OOM");
 }
-
-// /// Clamps to valid values.
-// pub fn decrementRange(self: *Self, allocator: Allocator, amount: u8) void {
-//     self.setRange(allocator, self.start_index - amount, self.end_index - amount);
-// }
-
-// /// Clamps to valid values.
-// pub fn incrementRange(self: *Self, allocator: Allocator, amount: u8) void {
-//     self.setRange(allocator, self.start_index + amount, self.end_index + amount);
-// }
 
 pub fn deinit(self: Self, allocator: Allocator) void {
     self.table.deinit(allocator);

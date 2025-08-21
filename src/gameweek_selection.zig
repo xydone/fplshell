@@ -1,4 +1,4 @@
-players: [15]?Player,
+players: [15]?Player, //TODO: turn this field into a hashmap. requires a vaxis table rewrite
 lineup_value: f32,
 in_the_bank: f32,
 transfers_made: u8,
@@ -124,11 +124,10 @@ pub fn appendRaw(self: *Self, player: Player) error{SelectionFull}!void {
     return error.SelectionFull;
 }
 
-pub fn remove(self: *Self, index: u16) void {
-    if (self.players[index]) |pl| {
-        self.lineup_value -= pl.price.?;
-        self.in_the_bank += pl.price.?;
-        self.players[index] = null;
+pub fn remove(self: *Self, id: u32) void {
+    for (self.players, 0..) |maybe_player, i| {
+        const player = maybe_player orelse continue;
+        if (player.id == id) self.players[i] = null;
     }
 }
 
