@@ -51,8 +51,18 @@ pub fn removePlayer(self: *Self, index: u32) void {
     }
 }
 
+pub fn swapPlayers(self: *Self, first_idx: u16, second_idx: u16) void {
+    std.mem.swap(
+        ?Player,
+        &self.gameweek_selections[self.active_idx].players[first_idx],
+        &self.gameweek_selections[self.active_idx].players[second_idx],
+    );
+    self.gameweek_selections[self.active_idx].is_valid_formation = self.gameweek_selections[self.active_idx].isValidFormation();
+}
+
 const FixtureTable = @import("components/fixture_table.zig");
 
+const Player = @import("types.zig").Player;
 const GAMEWEEK_COUNT = @import("types.zig").GAMEWEEK_COUNT;
 const GameweekSelection = @import("gameweek_selection.zig");
 

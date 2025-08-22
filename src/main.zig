@@ -139,6 +139,7 @@ pub fn main() !void {
         selection.in_the_bank = @floatFromInt(team_data.value.transfers.bank / 10);
         selection.lineup_value = @floatFromInt(team_data.value.transfers.value / 10);
         selection.free_transfers = @intCast(team_data.value.transfers.limit orelse 0);
+        selection.is_valid_formation = selection.isValidFormation();
 
         season_selections.active_idx = next_gw;
 
@@ -414,11 +415,7 @@ pub fn main() !void {
                             if (selected.table.context.row == rows[0]) break :selected;
 
                             // if we are still here, swap them
-                            std.mem.swap(
-                                ?Player,
-                                &season_selections.gameweek_selections[season_selections.active_idx].players[selected.table.context.row],
-                                &season_selections.gameweek_selections[season_selections.active_idx].players[rows[0]],
-                            );
+                            season_selections.swapPlayers(selected.table.context.row, rows[0]);
 
                             // update global to new state
                             gw_selection = season_selections.getActiveGameweek();

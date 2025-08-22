@@ -84,7 +84,7 @@ pub fn draw(
         .width = table_win.width,
         .height = 1,
     });
-    try drawTeamValues(team_value_window, bufs.stats_buf, lineup);
+    try drawTeamInfo(team_value_window, bufs.stats_buf, lineup);
 
     // draw transfers
 
@@ -100,11 +100,12 @@ pub fn draw(
     try drawInner(allocator, table_win, list, self.table.context);
 }
 
-fn drawTeamValues(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void {
+fn drawTeamInfo(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void {
     const seg: vaxis.Cell.Segment = .{
-        .text = try std.fmt.bufPrint(buf, "TV: {d:.1} | ITB: {d:.1}", .{
+        .text = try std.fmt.bufPrint(buf, "TV: {d:.1} | ITB: {d:.1} {s}", .{
             lineup.lineup_value,
             lineup.in_the_bank,
+            if (lineup.is_valid_formation) "" else "| Invalid formation!",
         }),
 
         .style = .{ .fg = .default, .bg = .default },

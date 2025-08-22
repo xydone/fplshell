@@ -1,4 +1,5 @@
 players: [15]?Player, //TODO: turn this field into a hashmap. requires a vaxis table rewrite
+is_valid_formation: bool,
 lineup_value: f32,
 in_the_bank: f32,
 transfers_made: u8,
@@ -15,6 +16,7 @@ pub fn init() Self {
         .transfers_made = 0,
         .free_transfers = 0,
         .hit_value = 0,
+        .is_valid_formation = false,
     };
 }
 
@@ -26,52 +28,74 @@ pub fn toString(self: Self, buf: *[15]Player) void {
     }
 }
 
-pub fn isValid(self: Self) bool {
+pub fn isValidFormation(self: Self) bool {
+    var starters: struct {
+        gk: u4 = 0,
+        def: u4 = 0,
+        mid: u4 = 0,
+        fwd: u4 = 0,
+    } = .{};
+
+    for (self.players[0..11]) |maybe_player| {
+        const player = maybe_player orelse continue;
+        // do not use this on empty players, pretty please.
+        switch (player.position.?) {
+            .gk => starters.gk += 1,
+            .def => starters.def += 1,
+            .mid => starters.mid += 1,
+            .fwd => starters.fwd += 1,
+        }
+    }
+
+    if (starters.gk != 1) return false;
+    if (starters.def < 3) return false;
+    if (starters.fwd < 1) return false;
+    return true;
+}
+
+pub fn isValid(self: *Self) bool {
     const MAX_PER_TEAM = 3;
-    var gk_count: u4 = 0;
-    var def_count: u4 = 0;
-    var mid_count: u4 = 0;
-    var fwd_count: u4 = 0;
+
+    var total: struct {
+        gk: u4 = 0,
+        def: u4 = 0,
+        mid: u4 = 0,
+        fwd: u4 = 0,
+    } = .{};
 
     const Team = struct { id: u32, count: u4 = 1 };
     var teams: [20]Team = undefined;
     var team_count: u8 = 0;
-    player_loop: for (self.players) |player| {
-        if (player) |pl| {
-            // do not use this on empty players, pretty please.
-            switch (pl.position.?) {
-                .gk => gk_count += 1,
-                .def => def_count += 1,
-                .mid => mid_count += 1,
-                .fwd => fwd_count += 1,
-            }
-            for (0..team_count) |i| {
-                if (teams[i].id == pl.team_id) {
-                    teams[i].count += 1;
-                    // early exit if player count exceeds maximum, continue loop if not
-                    // continuing the loop manually is done to deal with the teams list
-                    if (teams[i].count > MAX_PER_TEAM) return false else continue :player_loop;
-                }
-            }
-            // if we are here that means a team was not found inside []teams
-            teams[team_count] = Team{ .id = pl.team_id.? };
-            team_count += 1;
+
+    player_loop: for (self.players) |maybe_player| {
+        const player = maybe_player orelse continue;
+        // do not use this on empty players, pretty please.
+        switch (player.position.?) {
+            .gk => total.gk += 1,
+            .def => total.def += 1,
+            .mid => total.mid += 1,
+            .fwd => total.fwd += 1,
         }
+        for (0..team_count) |i| {
+            if (teams[i].id == player.team_id) {
+                teams[i].count += 1;
+                // early exit if player count exceeds maximum, continue loop if not
+                // continuing the loop manually is done to deal with the teams list
+                if (teams[i].count > MAX_PER_TEAM) return false else continue :player_loop;
+            }
+        }
+        // if we are here that means a team was not found inside []teams
+        teams[team_count] = Team{ .id = player.team_id.? };
+        team_count += 1;
     }
 
-    // no more than 2 goalkeepers
-    if (gk_count > 2) return false;
+    if (total.gk > 2) return false;
+    if (total.def > 5) return false;
+    if (total.mid > 5) return false;
+    if (total.fwd > 3) return false;
 
-    // no more than 5 defenders
-    if (def_count > 5) return false;
+    self.is_valid_formation = self.isValidFormation();
 
-    // no more than 5 midfielders
-    if (mid_count > 5) return false;
-
-    // no more than 3 forwards
-    if (fwd_count > 3) return false;
-
-    //if all is good...
     return true;
 }
 
@@ -127,7 +151,10 @@ pub fn appendRaw(self: *Self, player: Player) error{SelectionFull}!void {
 pub fn remove(self: *Self, id: u32) void {
     for (self.players, 0..) |maybe_player, i| {
         const player = maybe_player orelse continue;
-        if (player.id == id) self.players[i] = null;
+        if (player.id != id) continue;
+        self.players[i] = null;
+        self.lineup_value -= player.price.?;
+        self.in_the_bank += player.price.?;
     }
 }
 
