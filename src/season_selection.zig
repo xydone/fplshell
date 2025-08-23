@@ -51,6 +51,21 @@ pub fn removePlayer(self: *Self, index: u32) void {
     }
 }
 
+pub const AppendErrors = error{ SelectionFull, MissingFunds };
+pub const AppendOptions = struct {
+    /// if true, appends will propagate to future gameweeks
+    propagate: bool = false,
+};
+
+pub fn appendPlayer(self: *Self, player: Player, options: AppendOptions) AppendErrors!void {
+    try self.gameweek_selections[self.active_idx].append(player);
+    if (options.propagate) {
+        for (self.gameweek_selections[self.active_idx + 1 ..]) |*gw_selection| {
+            gw_selection.append(player) catch break;
+        }
+    }
+}
+
 pub fn swapPlayers(self: *Self, first_idx: u16, second_idx: u16) void {
     std.mem.swap(
         ?Player,

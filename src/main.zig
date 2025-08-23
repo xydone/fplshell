@@ -378,13 +378,15 @@ pub fn main() !void {
                     .search_table => search_table: {
                         const currently_selected_player = filtered_players.items[filtered.table.context.row];
                         if (key.matchExact(Key.enter, .{})) {
-                            gw_selection.append(currently_selected_player) catch |err| {
+                            season_selections.appendPlayer(currently_selected_player, .{ .propagate = true }) catch |err| {
                                 switch (err) {
                                     GameweekSelection.AppendErrors.MissingFunds => try error_message.setErrorMessage("Insufficient funds!", .search_table),
                                     GameweekSelection.AppendErrors.SelectionFull => try error_message.setErrorMessage("GameweekSelection is full!", .search_table),
                                 }
                                 break :search_table;
                             };
+                            // update the view for rendering
+                            gw_selection = season_selections.getActiveGameweek();
                         } else if (key.matches(Key.right, .{})) {
                             active_menu = .selected;
                             selected.table.makeActive();
