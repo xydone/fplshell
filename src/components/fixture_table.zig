@@ -82,7 +82,7 @@ pub fn deinit(self: Self, allocator: Allocator) void {
     self.header_names.deinit(allocator);
     allocator.destroy(self.header_names);
 }
-pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.ArrayList(Team)) !void {
+pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.ArrayList(Team), is_in_gameweek_selector: bool) !void {
     try drawInner(
         allocator,
         table_win,
@@ -90,6 +90,7 @@ pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.
         self.table.context,
         self.start_index,
         self.end_index,
+        is_in_gameweek_selector,
     );
 }
 
@@ -102,6 +103,7 @@ fn drawInner(
     table_ctx: *TableContext,
     start_index: u8,
     end_index: u8,
+    is_in_gameweek_selector: bool,
 ) !void {
     const fields = meta.fields(Team);
     const field_indexes = comptime allIdx: {
@@ -146,12 +148,14 @@ fn drawInner(
         );
         defer col_start += col_width;
         const hdr_fg, const hdr_bg = hdrColors: {
-            if (table_ctx.active and idx == table_ctx.col)
-                break :hdrColors .{ table_ctx.active_fg, table_ctx.active_bg }
-            else if (idx % 2 == 0)
-                break :hdrColors .{ .default, table_ctx.hdr_bg_1 }
-            else
-                break :hdrColors .{ .default, table_ctx.hdr_bg_2 };
+            if (table_ctx.active and idx == table_ctx.col) {
+                break :hdrColors .{ table_ctx.active_fg, table_ctx.active_bg };
+            }
+            if (idx % 2 == 0) {
+                break :hdrColors .{ .default, if (is_in_gameweek_selector) Colors.light_red else table_ctx.hdr_bg_1 };
+            }
+
+            break :hdrColors .{ .default, if (is_in_gameweek_selector) Colors.dark_red else table_ctx.hdr_bg_2 };
         };
         const hdr_win = table_win.child(.{
             .x_off = col_start,
@@ -213,6 +217,7 @@ fn drawInner(
                 if (mem.indexOfScalar(u16, rows, @intCast(table_ctx.start + row)) != null)
                     break :rowColors .{ table_ctx.selected_fg, Colors.darken(bg, 80) };
             }
+
             break :rowColors .{ fg, bg };
         };
 

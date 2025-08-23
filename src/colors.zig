@@ -5,6 +5,9 @@ pub const Color = vaxis.Cell.Color;
 pub const dark_blue: Color = .{ .rgb = .{ 24, 95, 122 } };
 pub const light_blue: Color = .{ .rgb = .{ 50, 133, 166 } };
 
+pub const dark_red: Color = .{ .rgb = .{ 87, 3, 18 } };
+pub const light_red: Color = .{ .rgb = .{ 227, 43, 75 } };
+
 pub const black: Color = .{ .rgb = .{ 0, 0, 0 } };
 pub const white: Color = .{ .rgb = .{ 255, 255, 255 } };
 

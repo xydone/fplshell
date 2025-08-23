@@ -509,6 +509,7 @@ pub fn main() !void {
             event_alloc,
             team_win,
             fixtures,
+            active_menu == .gameweek_selector,
         );
 
         // bottom bar
