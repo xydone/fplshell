@@ -1,10 +1,3 @@
-const std = @import("std");
-const Allocator = std.mem.Allocator;
-
-const Color = @import("colors.zig").Color;
-
-const HTTP = @import("http.zig");
-
 /// How old does the stored data have to be for us to request it again
 /// Defaults to 1hr.
 const STALE_AMOUNT = std.time.ns_per_hour * 1;
@@ -129,7 +122,7 @@ pub const GetStatic = struct {
             .path = "/api/bootstrap-static/",
         };
         const request = try http.get(allocator, Response, .{ .ignore_unknown_fields = true, .allocate = .alloc_always });
-        try saveToFile(allocator, Response, request.value, GetStatic.file_path);
+        try saveStructToFile(allocator, Response, request.value, GetStatic.file_path);
         return request;
     }
 };
@@ -165,31 +158,10 @@ pub const GetFixtures = struct {
 
         const request = try http.get(allocator, Response, .{ .ignore_unknown_fields = true, .allocate = .alloc_always });
 
-        try saveToFile(allocator, Response, request.value, GetFixtures.file_path);
+        try saveStructToFile(allocator, Response, request.value, GetFixtures.file_path);
         return request;
     }
 };
-fn saveToFile(allocator: Allocator, T: type, response: T, path: []const u8) !void {
-    const file = std.fs.cwd().createFile(path, .{}) catch |err| file: {
-        switch (err) {
-            // if the parent folder is not found, FileNotFound is thrown.
-            error.FileNotFound => {
-                // fs.path.dirname() returns null if the path is the root dir
-                const dirname = std.fs.path.dirname(path) orelse return err;
-                // create the dir
-                try std.fs.cwd().makeDir(dirname);
-                // retry creating the file
-                break :file try std.fs.cwd().createFile(path, .{});
-            },
-            else => return err,
-        }
-    };
-
-    const body_string = try std.json.stringifyAlloc(allocator, response, .{});
-    defer allocator.free(body_string);
-
-    _ = try file.writeAll(body_string);
-}
 
 /// Returns error.Stale if stale, and the type T if not stale
 /// Caller must free.
@@ -217,3 +189,12 @@ fn isStale(
 
     return try std.json.parseFromSlice(T, allocator, contents, .{ .allocate = .alloc_always });
 }
+
+const saveStructToFile = @import("util/saveStructToFile.zig").saveStructToFile;
+
+const Color = @import("colors.zig").Color;
+
+const HTTP = @import("http.zig");
+
+const Allocator = std.mem.Allocator;
+const std = @import("std");

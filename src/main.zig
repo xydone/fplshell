@@ -7,6 +7,7 @@ const command_list = [_]type{
     Sort,
     Quit,
     Horizon,
+    Save,
 };
 
 pub fn main() !void {
@@ -366,6 +367,13 @@ pub fn main() !void {
                                                 },
                                             };
                                         },
+                                        Save => {
+                                            Save.handle(command, .{
+                                                .it = &it,
+                                                .allocator = allocator,
+                                                .season_selection = season_selections,
+                                            }) catch try error_message.setErrorMessage("Cannot save transfer plan!", .cmd);
+                                        },
                                         else => @compileError(std.fmt.comptimePrint("No implementation for command {}.", .{Cmd})),
                                     }
                                 }
@@ -597,6 +605,7 @@ const Position = @import("commands/position.zig");
 const Sort = @import("commands/sort.zig");
 const Quit = @import("commands/quit.zig");
 const Horizon = @import("commands/horizon.zig");
+const Save = @import("commands/save.zig");
 
 const std = @import("std");
 
