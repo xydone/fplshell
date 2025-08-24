@@ -8,6 +8,7 @@ const command_list = [_]type{
     Quit,
     Horizon,
     Save,
+    Load,
 };
 
 pub fn main() !void {
@@ -205,6 +206,9 @@ pub fn main() !void {
     var gw_selection: GameweekSelection = season_selections.gameweek_selections[season_selections.active_idx];
     var fixture_table: FixtureTable = season_selections.fixture_table[season_selections.active_idx];
 
+    var loaded_transfer_plan: ?Load.LoadResponse = null;
+    defer if (loaded_transfer_plan) |lt| lt.deinit();
+
     while (true) {
         defer _ = event_arena.reset(.retain_capacity);
         defer tty_buf_writer.flush() catch {};
@@ -373,6 +377,18 @@ pub fn main() !void {
                                                 .allocator = allocator,
                                                 .season_selection = season_selections,
                                             }) catch try error_message.setErrorMessage("Cannot save transfer plan!", .cmd);
+                                        },
+                                        Load => {
+                                            const transfer_plan = try Load.handle(command, .{
+                                                .it = &it,
+                                                .allocator = allocator,
+                                                .season_selection = &season_selections,
+                                            }) orelse break :cmd;
+                                            if (loaded_transfer_plan) |lt| lt.deinit();
+                                            loaded_transfer_plan = transfer_plan;
+
+                                            // update the view for rendering
+                                            gw_selection = season_selections.getActiveGameweek();
                                         },
                                         else => @compileError(std.fmt.comptimePrint("No implementation for command {}.", .{Cmd})),
                                     }
@@ -607,6 +623,7 @@ const Sort = @import("commands/sort.zig");
 const Quit = @import("commands/quit.zig");
 const Horizon = @import("commands/horizon.zig");
 const Save = @import("commands/save.zig");
+const Load = @import("commands/load.zig");
 
 const std = @import("std");
 

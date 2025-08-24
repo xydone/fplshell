@@ -1,4 +1,4 @@
-gameweek_selections: [GAMEWEEK_COUNT]GameweekSelection,
+gameweek_selections: *[GAMEWEEK_COUNT]GameweekSelection,
 fixture_table: [GAMEWEEK_COUNT]FixtureTable,
 
 active_idx: u8,
@@ -6,7 +6,11 @@ active_idx: u8,
 const Self = @This();
 
 pub fn init(allocator: Allocator, range: u8) !Self {
-    const gameweek_selections = [_]GameweekSelection{GameweekSelection.init()} ** GAMEWEEK_COUNT;
+    // const gameweek_selections = [_]GameweekSelection{GameweekSelection.init()} ** GAMEWEEK_COUNT;
+    const gameweek_selections = try allocator.create([GAMEWEEK_COUNT]GameweekSelection);
+    for (gameweek_selections) |*gw_selection| {
+        gw_selection.* = .init();
+    }
     var fixture_tables: [GAMEWEEK_COUNT]FixtureTable = undefined;
     for (0..GAMEWEEK_COUNT) |i| {
         fixture_tables[i] = try .init(allocator, @intCast(i + 1), @intCast(i + 1 + range));
@@ -22,6 +26,7 @@ pub fn deinit(self: Self, allocator: Allocator) void {
     inline for (self.fixture_table) |fixture_table| {
         fixture_table.deinit(allocator);
     }
+    allocator.free(self.gameweek_selections);
 }
 
 pub fn incrementIndex(self: *Self, amount: u8) void {
