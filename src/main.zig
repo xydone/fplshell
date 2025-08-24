@@ -11,15 +11,19 @@ const command_list = [_]type{
     Load,
 };
 
+var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+
 pub fn main() !void {
-    var allocator_instance = std.heap.GeneralPurposeAllocator(.{
-        .stack_trace_frames = if (std.debug.sys_can_stack_trace) 10 else 0,
-        .resize_stack_traces = true,
-    }).init;
-    defer _ = allocator_instance.deinit();
-
-    const allocator = allocator_instance.allocator();
-
+    const allocator, const is_debug = gpa: {
+        if (builtin.target.os.tag == .wasi) break :gpa .{ std.heap.wasm_allocator, false };
+        break :gpa switch (builtin.mode) {
+            .Debug, .ReleaseSafe => .{ debug_allocator.allocator(), true },
+            .ReleaseFast, .ReleaseSmall => .{ std.heap.smp_allocator, false },
+        };
+    };
+    defer if (is_debug) {
+        _ = debug_allocator.deinit();
+    };
     // parse all player info
     var static_data = try GetStatic.call(allocator);
     defer static_data.deinit();
@@ -659,6 +663,7 @@ const Horizon = @import("commands/horizon.zig");
 const Save = @import("commands/save.zig");
 const Load = @import("commands/load.zig");
 
+const builtin = @import("builtin");
 const std = @import("std");
 
 test "tests:beforeAll" {
