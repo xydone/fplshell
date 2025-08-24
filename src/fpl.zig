@@ -163,6 +163,41 @@ pub const GetFixtures = struct {
     }
 };
 
+pub const GetEntryHistory = struct {
+    pub const Response = struct {
+        entry_history: struct {
+            event_transfers: u32,
+            bank: u32,
+            value: u32,
+        },
+        picks: []struct {
+            element: u32,
+            position: u8,
+            /// 1 - regular player
+            /// 2 - captain
+            /// 3 - triple captain
+            multiplier: u4,
+            is_captain: bool,
+            is_vice_captain: bool,
+            element_type: u32,
+        },
+    };
+
+    /// Caller must free
+    pub fn call(allocator: Allocator, team_id: u32, gameweek: u8) !std.json.Parsed(Response) {
+        const path = try std.fmt.allocPrint(allocator, "/api/entry/{d}/event/{d}/picks/", .{ team_id, gameweek });
+        defer allocator.free(path);
+
+        const http = HTTP{
+            .url = "https://fantasy.premierleague.com",
+            .headers = "",
+            .path = path,
+        };
+        const request = try http.get(allocator, Response, .{ .ignore_unknown_fields = true, .allocate = .alloc_always });
+        return request;
+    }
+};
+
 /// Returns error.Stale if stale, and the type T if not stale
 /// Caller must free.
 fn isStale(

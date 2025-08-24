@@ -124,30 +124,63 @@ pub fn main() !void {
 
     season_selections.active_idx = next_gw;
 
-    readTeam: {
-        var team_list: Team.TeamList = .init();
-        var selection: GameweekSelection = .init();
-        // if team.json doesn't exist, leave gw_selection empty
-        const team_data = Config.getTeam(allocator) catch break :readTeam;
-        defer team_data.deinit();
-        for (team_data.value.picks) |pick| {
-            const player = player_map.get(pick.element);
-            if (player) |pl| {
-                try selection.appendRaw(pl);
-                const team = team_map.get(pl.team_id.?) orelse @panic("Team not found in team map!");
-                try team_list.appendAny(team);
+    var config = Config.get(allocator) catch return error.CannotReadConfigFile;
+    defer config.deinit();
+
+    switch (config.value.team_source) {
+        .file => file: {
+            var selection: GameweekSelection = .init();
+            // if team.json doesn't exist, leave gw_selection empty
+            const team_data = Config.TeamFile.get(allocator) catch break :file;
+            defer team_data.deinit();
+            for (team_data.value.picks) |pick| {
+                const player = player_map.get(pick.element);
+                if (player) |pl| {
+                    try selection.appendRaw(pl);
+                }
             }
-        }
-        selection.in_the_bank = @floatFromInt(team_data.value.transfers.bank / 10);
-        selection.lineup_value = @floatFromInt(team_data.value.transfers.value / 10);
-        selection.free_transfers = @intCast(team_data.value.transfers.limit orelse 0);
-        selection.is_valid_formation = selection.isValidFormation();
+            selection.in_the_bank = @floatFromInt(team_data.value.transfers.bank / 10);
+            selection.lineup_value = @floatFromInt(team_data.value.transfers.value / 10);
+            selection.free_transfers = @intCast(team_data.value.transfers.limit orelse 0);
+            selection.is_valid_formation = selection.isValidFormation();
 
-        season_selections.active_idx = next_gw;
+            for (next_gw..GAMEWEEK_COUNT) |i| {
+                season_selections.insertGameweek(selection, @intCast(i));
+            }
+        },
+        .team_id => |id| {
+            var last_selection: GameweekSelection = undefined;
 
-        for (next_gw..GAMEWEEK_COUNT) |i| {
-            season_selections.insertGameweek(selection, @intCast(i));
-        }
+            var response_idx: u8 = 0;
+            while (response_idx < next_gw) : (response_idx += 1) {
+                const is_last_iteration = response_idx == next_gw - 1;
+
+                var selection: GameweekSelection = .init();
+                const entry_history = try GetEntryHistory.call(allocator, id, response_idx + 1);
+                defer entry_history.deinit();
+
+                for (entry_history.value.picks) |pick| {
+                    const player = player_map.get(pick.element);
+                    if (player) |pl| {
+                        try selection.appendRaw(pl);
+                    }
+                }
+
+                selection.in_the_bank = @floatFromInt(entry_history.value.entry_history.bank / 10);
+                selection.lineup_value = @floatFromInt(entry_history.value.entry_history.value / 10);
+                selection.free_transfers = @intCast(entry_history.value.entry_history.event_transfers);
+                selection.is_valid_formation = selection.isValidFormation();
+
+                season_selections.insertGameweek(selection, response_idx);
+                // if we've reached the last iteration, prepare data for the propagation
+                if (is_last_iteration) last_selection = selection;
+            }
+
+            var propagate_idx: u8 = response_idx;
+            while (propagate_idx < GAMEWEEK_COUNT) : (propagate_idx += 1) {
+                season_selections.insertGameweek(last_selection, propagate_idx);
+            }
+        },
     }
 
     var descriptions: [command_list.len]CommandDescription = undefined;
@@ -613,6 +646,7 @@ const Colors = @import("colors.zig");
 const Teams = @import("fpl.zig").Teams;
 const GetStatic = @import("fpl.zig").GetStatic;
 const GetFixtures = @import("fpl.zig").GetFixtures;
+const GetEntryHistory = @import("fpl.zig").GetEntryHistory;
 
 const Go = @import("commands/go.zig");
 const Refresh = @import("commands/refresh.zig");
