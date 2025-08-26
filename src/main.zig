@@ -145,20 +145,20 @@ pub fn main() !void {
             }
             selection.in_the_bank = @floatFromInt(team_data.value.transfers.bank / 10);
             selection.lineup_value = @floatFromInt(team_data.value.transfers.value / 10);
-            selection.free_transfers = @intCast(team_data.value.transfers.limit orelse 0);
             selection.is_valid_formation = selection.isValidFormation();
 
+            selection.addFreeTransfers(@intCast(team_data.value.transfers.limit orelse 0));
+
             for (next_gw..GAMEWEEK_COUNT) |i| {
+                selection.addFreeTransfers(1);
                 season_selections.insertGameweek(selection, @intCast(i));
             }
         },
         .team_id => |id| {
-            var last_selection: GameweekSelection = undefined;
+            var last_selection: ?GameweekSelection = null;
 
             var response_idx: u8 = 0;
             while (response_idx < next_gw) : (response_idx += 1) {
-                const is_last_iteration = response_idx == next_gw - 1;
-
                 var selection: GameweekSelection = .init();
                 const entry_history = try GetEntryHistory.call(allocator, id, response_idx + 1);
                 defer entry_history.deinit();
@@ -172,17 +172,26 @@ pub fn main() !void {
 
                 selection.in_the_bank = @floatFromInt(entry_history.value.entry_history.bank / 10);
                 selection.lineup_value = @floatFromInt(entry_history.value.entry_history.value / 10);
-                selection.free_transfers = @intCast(entry_history.value.entry_history.event_transfers);
+
+                var transfers: u8 = 0;
+                // add one transfer
+                if (last_selection) |ls| transfers = ls.free_transfers + 1;
+                // remove transfers used this gameweek
+                transfers -= @intCast(entry_history.value.entry_history.event_transfers);
+
+                selection.addFreeTransfers(transfers);
+
                 selection.is_valid_formation = selection.isValidFormation();
 
                 season_selections.insertGameweek(selection, response_idx);
-                // if we've reached the last iteration, prepare data for the propagation
-                if (is_last_iteration) last_selection = selection;
+                last_selection = selection;
             }
 
             var propagate_idx: u8 = response_idx;
             while (propagate_idx < GAMEWEEK_COUNT) : (propagate_idx += 1) {
-                season_selections.insertGameweek(last_selection, propagate_idx);
+                // add free transfers
+                last_selection.?.addFreeTransfers(1);
+                season_selections.insertGameweek(last_selection.?, propagate_idx);
             }
         },
     }

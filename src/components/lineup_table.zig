@@ -1,25 +1,3 @@
-const std = @import("std");
-const fmt = std.fmt;
-const heap = std.heap;
-const mem = std.mem;
-const meta = std.meta;
-const Allocator = std.mem.Allocator;
-
-const vaxis = @import("vaxis");
-const Window = vaxis.Window;
-const Segment = vaxis.Cell.Segment;
-const Table = vaxis.widgets.Table;
-const Color = vaxis.Cell.Color;
-
-pub const TableContext = Table.TableContext;
-const calcColWidth = Table.calcColWidth;
-
-const Player = @import("../types.zig").Player;
-const GameweekSelection = @import("../gameweek_selection.zig");
-const Colors = @import("../colors.zig");
-
-const TableCommon = @import("table_common.zig");
-
 table: TableCommon,
 
 const Self = @This();
@@ -119,7 +97,7 @@ fn drawTransfers(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !voi
         .text = try std.fmt.bufPrint(buf, "FT: {} | TM: {} | Cost: {}", .{
             lineup.free_transfers,
             lineup.transfers_made,
-            lineup.transfers_made * lineup.hit_value,
+            lineup.amount_of_hits * HIT_VALUE,
         }),
 
         .style = .{ .fg = .default, .bg = .default },
@@ -333,3 +311,26 @@ fn drawInner(
         }
     }
 }
+
+const vaxis = @import("vaxis");
+const Window = vaxis.Window;
+const Segment = vaxis.Cell.Segment;
+const Table = vaxis.widgets.Table;
+const Color = vaxis.Cell.Color;
+
+pub const TableContext = Table.TableContext;
+const calcColWidth = Table.calcColWidth;
+
+const HIT_VALUE = @import("../types.zig").HIT_VALUE;
+const Player = @import("../types.zig").Player;
+const GameweekSelection = @import("../gameweek_selection.zig");
+const Colors = @import("../colors.zig");
+
+const TableCommon = @import("table_common.zig");
+
+const fmt = std.fmt;
+const heap = std.heap;
+const mem = std.mem;
+const meta = std.meta;
+const Allocator = std.mem.Allocator;
+const std = @import("std");

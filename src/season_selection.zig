@@ -49,10 +49,22 @@ pub fn insertGameweek(self: *Self, gw_selection: GameweekSelection, gw_num: u8) 
     self.gameweek_selections[gw_num] = gw_selection;
 }
 
+//TODO: make this work with wildcards/free hits
 pub fn removePlayer(self: *Self, index: u32) void {
     const player = self.gameweek_selections[self.active_idx].players[index] orelse return;
+    var are_free_transfers_adjusted = false;
     for (self.gameweek_selections[self.active_idx..]) |*gameweek| {
         gameweek.remove(player.id.?);
+        const transfer_amount_before_update = gameweek.free_transfers;
+
+        if (transfer_amount_before_update == 0) {
+            gameweek.takeHit(1);
+            break;
+        }
+
+        if (are_free_transfers_adjusted == false) gameweek.removeFreeTransfers(1);
+
+        if (transfer_amount_before_update == MAX_FREE_TRANSFERS) are_free_transfers_adjusted = true;
     }
 }
 
@@ -83,6 +95,8 @@ pub fn swapPlayers(self: *Self, first_idx: u16, second_idx: u16) void {
 const FixtureTable = @import("components/fixture_table.zig");
 
 const Player = @import("types.zig").Player;
+
+const MAX_FREE_TRANSFERS = @import("types.zig").MAX_FREE_TRANSFERS;
 const GAMEWEEK_COUNT = @import("types.zig").GAMEWEEK_COUNT;
 const GameweekSelection = @import("gameweek_selection.zig");
 

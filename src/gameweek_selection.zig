@@ -4,7 +4,7 @@ lineup_value: f32,
 in_the_bank: f32,
 transfers_made: u8,
 free_transfers: u8,
-hit_value: u8,
+amount_of_hits: u8,
 
 const Self = @This();
 
@@ -15,7 +15,7 @@ pub fn init() Self {
         .in_the_bank = 0,
         .transfers_made = 0,
         .free_transfers = 0,
-        .hit_value = 0,
+        .amount_of_hits = 0,
         .is_valid_formation = false,
     };
 }
@@ -158,4 +158,18 @@ pub fn remove(self: *Self, id: u32) void {
     }
 }
 
+pub fn addFreeTransfers(self: *Self, amount: u8) void {
+    const free_transfers: u8 = self.free_transfers + amount;
+    self.free_transfers = if (free_transfers > MAX_FREE_TRANSFERS) MAX_FREE_TRANSFERS else free_transfers;
+}
+pub fn removeFreeTransfers(self: *Self, amount: u8) void {
+    self.free_transfers = std.math.sub(u8, self.free_transfers, amount) catch 0;
+}
+
+pub fn takeHit(self: *Self, amount: u8) void {
+    self.amount_of_hits += amount;
+}
+
+const MAX_FREE_TRANSFERS = @import("types.zig").MAX_FREE_TRANSFERS;
 const Player = @import("types.zig").Player;
+const std = @import("std");
