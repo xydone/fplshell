@@ -226,9 +226,9 @@ pub fn main() !void {
     var event_arena = std.heap.ArenaAllocator.init(allocator);
     defer event_arena.deinit();
 
-    var filtered = try PlayerTable.init(allocator, "Select a player");
-    defer filtered.deinit(allocator);
-    filtered.table.makeActive();
+    var search_table = try PlayerTable.init(allocator, "Select a player");
+    defer search_table.deinit(allocator);
+    search_table.table.makeActive();
 
     var selected = try LineupTable.init(allocator, "Selected players");
     defer selected.deinit(allocator);
@@ -275,7 +275,7 @@ pub fn main() !void {
                 }
                 row_navigation: {
                     var active_table: *TableCommon = switch (active_menu) {
-                        .search_table => &filtered.table,
+                        .search_table => &search_table.table,
                         .selected => &selected.table,
                         else => break :row_navigation,
                     };
@@ -325,7 +325,7 @@ pub fn main() !void {
                                         Go => {
                                             Go.handle(command, .{
                                                 .it = &it,
-                                                .players_table = &filtered,
+                                                .players_table = &search_table,
                                             }) catch |err| switch (err) {
                                                 Go.Errors.EmptyToken => {},
                                                 Go.Errors.TokenNaN => {
@@ -349,7 +349,7 @@ pub fn main() !void {
                                                 .allocator = event_alloc,
                                                 .it = it,
                                                 .player_map = player_map,
-                                                .player_table = &filtered,
+                                                .player_table = &search_table,
                                                 .filtered_players = &filtered_players,
                                             }) catch |err| switch (err) {
                                                 Search.Errors.EmptyString => {
@@ -373,7 +373,7 @@ pub fn main() !void {
                                         Position => {
                                             Position.handle(command, .{
                                                 .it = it,
-                                                .player_table = &filtered,
+                                                .player_table = &search_table,
                                                 .filtered_players = &filtered_players,
                                                 .all_players = all_players,
                                             }) catch |err| switch (err) {
@@ -437,7 +437,7 @@ pub fn main() !void {
                         }
                     },
                     .search_table => search_table: {
-                        const currently_selected_player = filtered_players.items[filtered.table.context.row];
+                        const currently_selected_player = filtered_players.items[search_table.table.context.row];
                         if (key.matchExact(Key.enter, .{})) {
                             season_selections.appendPlayer(currently_selected_player, .{ .propagate = true }) catch |err| {
                                 switch (err) {
@@ -451,13 +451,13 @@ pub fn main() !void {
                         } else if (key.matches(Key.right, .{})) {
                             active_menu = .selected;
                             selected.table.makeActive();
-                            filtered.table.makeNormal();
+                            search_table.table.makeNormal();
                         }
                     },
                     .selected => selected: {
                         if (key.matches(Key.left, .{})) {
                             active_menu = .search_table;
-                            filtered.table.makeActive();
+                            search_table.table.makeActive();
                             selected.table.makeNormal();
                         } else if (key.matchExact(Key.enter, .{})) {
                             season_selections.removePlayer(selected.table.context.row);
@@ -500,27 +500,42 @@ pub fn main() !void {
         var x_off: i17 = 1;
         const y_off: i17 = 2;
         // left table
-        const filtered_win = win.child(.{
-            .x_off = x_off,
-            .y_off = y_off,
-            .width = win.width / 3,
-            .height = ROWS_PER_TABLE + 2,
-        });
+        var search_table_border_menus = [_]Menu{.search_table};
+        const search_table_win = createChild(.{
+            .initial_layout = .{
+                .x_off = x_off,
+                .y_off = y_off,
+                .width = win.width / 3,
+                .height = ROWS_PER_TABLE + 2,
+            },
+            .window = win,
+            .active_menu = active_menu,
+            .border_menus = &search_table_border_menus,
+        }, .{});
 
-        try filtered.draw(
+        try search_table.draw(
             event_alloc,
             win,
-            filtered_win,
+            search_table_win,
             filtered_players,
         );
 
-        // gw_selection table
-        x_off += filtered_win.width + 2;
-        const selected_win = win.child(.{
-            .x_off = x_off,
-            .y_off = y_off,
-            .width = win.width / 3,
-            .height = ROWS_PER_TABLE + 2,
+        // selected players table
+        x_off += search_table_win.width + 2;
+        var selected_table_border_menus = [_]Menu{.selected};
+        const selected_win = createChild(.{
+            .initial_layout = .{
+                .x_off = x_off,
+                .y_off = y_off,
+                .width = win.width / 3,
+                .height = ROWS_PER_TABLE + 2,
+            },
+            .window = win,
+            .active_menu = active_menu,
+            .border_menus = &selected_table_border_menus,
+        }, .{
+            // everywhere except on the right
+            .locations = .{ .left = true, .top = true, .bottom = true },
         });
 
         var stats_buf: [1024]u8 = undefined;
@@ -539,11 +554,20 @@ pub fn main() !void {
 
         // team table
         x_off += selected_win.width;
-        const team_win = win.child(.{
-            .x_off = x_off,
-            .y_off = y_off,
-            .width = win.width / 3,
-            .height = ROWS_PER_TABLE + 2,
+        var team_table_border_menus = [_]Menu{ .selected, .gameweek_selector };
+        const team_win = createChild(.{
+            .initial_layout = .{
+                .x_off = x_off,
+                .y_off = y_off,
+                .width = win.width / 3,
+                .height = ROWS_PER_TABLE + 2,
+            },
+            .window = win,
+            .active_menu = active_menu,
+            .border_menus = &team_table_border_menus,
+        }, .{
+            // if the active menu is the selected table, draw the remainder of the border on here, else default.
+            .locations = if (active_menu == .selected) .{ .right = true, .top = true, .bottom = true } else CreateChildOptions.all_selected,
         });
         var team_buf: [15]Team = undefined;
 
@@ -562,7 +586,6 @@ pub fn main() !void {
             event_alloc,
             team_win,
             fixtures,
-            active_menu == .gameweek_selector,
         );
 
         // bottom bar
@@ -638,8 +661,10 @@ const LineupTable = @import("components/lineup_table.zig");
 const FixtureTable = @import("components/fixture_table.zig");
 
 const SeasonSelection = @import("season_selection.zig");
-
 const GameweekSelection = @import("gameweek_selection.zig");
+
+const CreateChildOptions = @import("util/window.zig").Options;
+const createChild = @import("util/window.zig").createChild;
 
 const Menu = @import("components/menus.zig").Menu;
 
