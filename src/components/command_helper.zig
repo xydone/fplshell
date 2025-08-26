@@ -1,14 +1,3 @@
-const std = @import("std");
-const vaxis = @import("vaxis");
-const Window = vaxis.Window;
-const Segment = vaxis.Cell.Segment;
-const Table = vaxis.widgets.Table;
-const Color = vaxis.Cell.Color;
-
-const Colors = @import("../colors.zig");
-
-const Command = @import("../commands/command.zig");
-const FilteredView = @import("../util/filtered_view.zig").FilteredView;
 commands: FilteredView(Command, predicate),
 
 const Self = @This();
@@ -54,18 +43,27 @@ pub fn draw(self: *Self, win: Window, phrase: []const u8) !void {
             .height = 1,
         });
         bar.fill(.{ .style = .{ .bg = bg_color } });
+
         const segment = Segment{
             .text = command.phrases[0], //TODO: better way of doing this
             .style = if (active_parameter == 0) active_style else inactive_style,
         };
-        x_offset += @intCast(segment.text.len + 1);
 
-        _ = bar.printSegment(segment, .{});
+        _ = bar.printSegment(segment, .{ .col_offset = 1 });
+        x_offset += @intCast(segment.text.len + 2);
+
+        var param_description: ?[]const u8 = null;
+
         if (command.params) |params| {
             for (params, 1..) |param, param_idx| {
+                const is_active = param_idx == active_parameter;
+                if (is_active) {
+                    param_description = param.description;
+                }
+
                 const param_segment = Segment{
                     .text = param.name,
-                    .style = if (param_idx == active_parameter) active_style else inactive_style,
+                    .style = if (is_active) active_style else inactive_style,
                 };
                 _ = bar.printSegment(param_segment, .{ .col_offset = x_offset });
                 x_offset += @intCast(param_segment.text.len + 1);
@@ -74,10 +72,24 @@ pub fn draw(self: *Self, win: Window, phrase: []const u8) !void {
 
         if (command.description) |cmd_desc| {
             const command_description = Segment{
-                .text = cmd_desc,
+                .text = param_description orelse cmd_desc,
                 .style = hint_style,
             };
-            _ = bar.printSegment(command_description, .{ .col_offset = @intCast(bar.width - cmd_desc.len) });
+            _ = bar.printSegment(command_description, .{ .col_offset = @intCast(bar.width - 1 - command_description.text.len) });
         }
     }
 }
+
+const Colors = @import("../colors.zig");
+
+const Command = @import("../commands/command.zig");
+const FilteredView = @import("../util/filtered_view.zig").FilteredView;
+
+const Window = vaxis.Window;
+const Segment = vaxis.Cell.Segment;
+const Table = vaxis.widgets.Table;
+const Color = vaxis.Cell.Color;
+
+const vaxis = @import("vaxis");
+
+const std = @import("std");
