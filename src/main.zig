@@ -504,6 +504,14 @@ pub fn main() !void {
 
                             // update display
                             gw_selection = season_selections.getActiveGameweek();
+                        } else if (key.matchExact('c', .{})) {
+                            season_selections.gameweek_selections[season_selections.active_idx].captain_idx = @intCast(selected.table.context.row);
+
+                            gw_selection = season_selections.getActiveGameweek();
+                        } else if (key.matchExact('v', .{})) {
+                            season_selections.gameweek_selections[season_selections.active_idx].vice_captain_idx = @intCast(selected.table.context.row);
+
+                            gw_selection = season_selections.getActiveGameweek();
                         } else if (key.matchExact(Key.space, .{})) {
                             const rows = selected.table.context.sel_rows orelse {
                                 selected.table.context.sel_rows = try allocator.alloc(u16, 1);

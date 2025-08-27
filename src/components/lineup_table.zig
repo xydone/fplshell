@@ -36,14 +36,14 @@ pub fn draw(
     allocator: Allocator,
     win: Window,
     table_win: Window,
-    lineup: GameweekSelection,
+    gameweek_selection: GameweekSelection,
     bufs: struct {
         stats_buf: *[1024]u8,
         transfer_buf: *[1024]u8,
     },
 ) !void {
     var lineup_buf: [15]Player = undefined;
-    lineup.toString(&lineup_buf);
+    gameweek_selection.toString(&lineup_buf);
     const list = std.ArrayList(Player).fromOwnedSlice(allocator, &lineup_buf);
     // prepare segment
     const bar = win.child(.{
@@ -56,14 +56,14 @@ pub fn draw(
     _ = bar.printSegment(self.table.segment.?, .{ .wrap = .word });
 
     // draw team values
-    const text_offset: i17 = if (lineup.chip_active != .bench_boost) 1 else 0;
+    const text_offset: i17 = if (gameweek_selection.chip_active != .bench_boost) 1 else 0;
     const team_value_window = win.child(.{
         .x_off = table_win.x_off,
         .y_off = table_win.height + text_offset + 1,
         .width = table_win.width,
         .height = 1,
     });
-    try drawTeamInfo(team_value_window, bufs.stats_buf, lineup);
+    try drawTeamInfo(team_value_window, bufs.stats_buf, gameweek_selection);
 
     // draw transfers
 
@@ -74,14 +74,14 @@ pub fn draw(
         .width = table_win.width,
         .height = 1,
     });
-    try drawTransfers(transfer_window, bufs.transfer_buf, lineup);
+    try drawTransfers(transfer_window, bufs.transfer_buf, gameweek_selection);
 
     try drawInner(
         allocator,
         table_win,
         list,
         self.table.context,
-        lineup.chip_active,
+        gameweek_selection,
     );
 }
 
@@ -138,7 +138,7 @@ fn drawInner(
     win: vaxis.Window,
     data_list: std.ArrayList(Player),
     table_ctx: *TableContext,
-    chip_active: ?Chips,
+    gameweek_selection: GameweekSelection,
 ) !void {
     const fields = meta.fields(Player);
     const field_indexes = switch (table_ctx.col_indexes) {
@@ -243,6 +243,8 @@ fn drawInner(
     table_ctx.start = @min(table_ctx.start, end);
     table_ctx.active_y_off = 0;
     for (data_list.items[table_ctx.start..end], 0..) |player, row| {
+        const is_captain = if (gameweek_selection.captain_idx) |idx| idx == row else false;
+        const is_vice_captain = if (gameweek_selection.vice_captain_idx) |idx| idx == row else false;
         const row_fg, const row_bg = rowColors: {
             const fg = player.foreground_color orelse .default;
             const bg = player.background_color orelse table_ctx.row_bg_1;
@@ -256,14 +258,14 @@ fn drawInner(
             break :rowColors .{ fg, bg };
         };
 
-        col_start = 0;
+        col_start = if (is_captain or is_vice_captain) 1 else 0;
         const item_fields = meta.fields(Player);
         var col_idx: usize = 0;
 
         const row_y_off: i17 = blk: {
             const y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
             if (row > 10) {
-                if (chip_active != .bench_boost) break :blk y_off + 1 else break :blk y_off;
+                if (gameweek_selection.chip_active != .bench_boost) break :blk y_off + 1 else break :blk y_off;
             } else break :blk y_off;
         };
         var row_win = table_win.child(.{
@@ -277,7 +279,7 @@ fn drawInner(
         }
 
         // draw a bench line
-        if (row == 10 and chip_active != .bench_boost) {
+        if (row == 10 and gameweek_selection.chip_active != .bench_boost) {
             const bench_win = table_win.child(.{
                 .x_off = 1,
                 .y_off = row_y_off + 1, // only increasing by 1 on the line before the bench to make sure this does not offset the entire table
@@ -290,6 +292,24 @@ fn drawInner(
                 .style = .{},
             };
             _ = bench_win.printSegment(segment, .{ .wrap = .word });
+        }
+        // draw a captaincy square
+        if (is_captain) {
+            const captain_window = row_win.child(.{
+                .x_off = 0,
+                .y_off = 0,
+                .width = 1,
+                .height = 1,
+            });
+            captain_window.fill(.{ .style = .{ .bg = Colors.captain } });
+        } else if (is_vice_captain) {
+            const vice_captain_window = row_win.child(.{
+                .x_off = 0,
+                .y_off = 0,
+                .width = 1,
+                .height = 1,
+            });
+            vice_captain_window.fill(.{ .style = .{ .bg = Colors.vice_captain } });
         }
         for (field_indexes) |f_idx| {
             inline for (item_fields[0..], 0..) |item_field, item_idx| contFields: {
@@ -309,6 +329,7 @@ fn drawInner(
                 defer col_start += col_width;
                 const item = @field(player, item_field.name);
                 const ItemT = @TypeOf(item);
+
                 const item_win = row_win.child(.{
                     .x_off = col_start,
                     .y_off = 0,
@@ -333,11 +354,11 @@ fn drawInner(
                     };
                 };
 
-                var seg = [_]vaxis.Cell.Segment{.{
+                const seg: Segment = .{
                     .text = if (item_txt.len > col_width and allocator != null) try fmt.allocPrint(allocator.?, "{s}...", .{item_txt[0..(col_width -| 4)]}) else item_txt,
                     .style = .{ .fg = row_fg, .bg = row_bg },
-                }};
-                _ = item_align_win.print(seg[0..], .{ .wrap = .word, .col_offset = table_ctx.cell_x_off });
+                };
+                _ = item_align_win.printSegment(seg, .{ .wrap = .word, .col_offset = table_ctx.cell_x_off });
             }
         }
     }

@@ -14,6 +14,9 @@ pub const white: Color = .{ .rgb = .{ 255, 255, 255 } };
 pub const light_gray: Color = .{ .rgb = .{ 182, 182, 182 } };
 pub const gray: Color = .{ .rgb = .{ 124, 124, 124 } };
 
+pub const captain: Color = .{ .rgb = .{ 239, 191, 4 } };
+pub const vice_captain: Color = .{ .rgb = .{ 196, 196, 196 } };
+
 pub fn getTextColor(color: Color) Color {
     const r = color.rgb[0];
     const g = color.rgb[1];

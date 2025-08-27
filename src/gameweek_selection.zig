@@ -6,6 +6,8 @@ transfers_made: u8,
 free_transfers: u8,
 amount_of_hits: u8,
 chip_active: ?Chips,
+captain_idx: ?u8,
+vice_captain_idx: ?u8,
 
 const Self = @This();
 
@@ -19,6 +21,8 @@ pub fn init() Self {
         .amount_of_hits = 0,
         .is_valid_formation = false,
         .chip_active = null,
+        .captain_idx = null,
+        .vice_captain_idx = null,
     };
 }
 
