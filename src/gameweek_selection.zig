@@ -175,17 +175,23 @@ pub fn takeHit(self: *Self, amount: u8) void {
 pub fn activateChip(self: *Self, chip: Chips) void {
     self.chip_active = chip;
     switch (chip) {
-        .wildcard => {
+        .wildcard, .free_hit => {
             // clear hits
             self.amount_of_hits = 0;
-            // give unlimited transfers for this gameweek
-            self.free_transfers = 15;
         },
-        .free_hit => {
+        .bench_boost => {},
+        .triple_captain => {},
+    }
+}
+
+pub fn deactivateChip(self: *Self) void {
+    const chip = self.chip_active orelse return;
+    self.chip_active = null;
+
+    switch (chip) {
+        .wildcard, .free_hit => {
             // clear hits
-            self.amount_of_hits = 0;
-            // give unlimited transfers for this gameweek
-            self.free_transfers = 15;
+            self.amount_of_hits = self.free_transfers - self.transfers_made;
         },
         .bench_boost => {},
         .triple_captain => {},

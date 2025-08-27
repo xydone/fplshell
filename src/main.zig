@@ -459,9 +459,6 @@ pub fn main() !void {
                                                 .season_selections = &season_selections,
                                                 .it = &it,
                                             }) catch |err| switch (err) {
-                                                Chip.Errors.EmptyChipName => {
-                                                    try error_message.setErrorMessage("Chip name missing!", .cmd);
-                                                },
                                                 Chip.Errors.InvalidChip => {
                                                     try error_message.setErrorMessage("Chip does not exist!", .cmd);
                                                 },

@@ -101,10 +101,28 @@ fn drawTeamInfo(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void
 
 fn drawTransfers(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void {
     const seg: vaxis.Cell.Segment = .{
-        .text = try std.fmt.bufPrint(buf, "FT: {} | TM: {} | Cost: {}", .{
-            lineup.free_transfers,
+        .text = try std.fmt.bufPrint(buf, "FT: {s} | TM: {} | Cost: {} {s}", .{
+            blk: {
+                if (lineup.chip_active) |chip| {
+                    switch (chip) {
+                        .wildcard, .free_hit => break :blk "∞",
+                        else => {},
+                    }
+                }
+                var ft_value_buf: [3]u8 = undefined;
+                break :blk try std.fmt.bufPrint(&ft_value_buf, "{}", .{lineup.free_transfers});
+            },
             lineup.transfers_made,
             lineup.amount_of_hits * HIT_VALUE,
+            if (lineup.chip_active) |chip|
+            blk: {
+                break :blk switch (chip) {
+                    .wildcard => "| Wildcard active!",
+                    .free_hit => "| Free hit active!",
+                    .triple_captain => "| Triple captain active!",
+                    .bench_boost => "| Bench boost active!",
+                };
+            } else "",
         }),
 
         .style = .{ .fg = .default, .bg = .default },

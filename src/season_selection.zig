@@ -60,6 +60,18 @@ pub fn activateChip(self: *Self, chip: Chips) void {
     }
 }
 
+pub fn deactivateChip(self: *Self) void {
+    const chip = self.gameweek_selections[self.active_idx].chip_active orelse return;
+    self.gameweek_selections[self.active_idx].deactivateChip();
+    // if its a wildcard, we also need to dock 1 free transfer from future gameweeks
+    // NOTE: wildcards can only be activated if a move is made
+    if (chip == .wildcard) {
+        for (self.gameweek_selections[self.active_idx + 1 ..]) |*gameweek| {
+            gameweek.addFreeTransfers(1);
+        }
+    }
+}
+
 //TODO: make this work with wildcards/free hits
 pub fn removePlayer(self: *Self, index: u32) void {
     const player = self.gameweek_selections[self.active_idx].players[index] orelse return;

@@ -1,8 +1,8 @@
 var COMMANDS = [_][]const u8{"chip"};
 var PARAMS = [_]CommandParams{
     .{
-        .name = "<string>",
-        .description = "The name of the chip",
+        .name = "<?string>",
+        .description = "The name of the chip. Empty string remove an existing chip.",
     },
 };
 
@@ -25,13 +25,16 @@ pub const Params = struct {
     allocator: Allocator,
 };
 
-pub const Errors = error{ EmptyChipName, InvalidChip };
+pub const Errors = error{InvalidChip};
 
 fn call(params: Params) Errors!void {
     const it = params.it;
     const season_selections = params.season_selections;
 
-    const chip_name_token = it.next() orelse return error.EmptyChipName;
+    const chip_name_token = it.next() orelse {
+        season_selections.deactivateChip();
+        return;
+    };
     const chip_names = std.meta.stringToEnum(Chips.Names, chip_name_token) orelse return error.InvalidChip;
     season_selections.activateChip(chip_names.normalise());
 }
