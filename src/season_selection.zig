@@ -53,7 +53,7 @@ pub fn activateChip(self: *Self, chip: Chips) void {
     self.gameweek_selections[self.active_idx].activateChip(chip);
     // if its a wildcard, we also need to dock 1 free transfer from future gameweeks
     // NOTE: wildcards can only be activated if a move is made
-    if (chip == .wildcard or chip == .wc) {
+    if (chip == .wildcard) {
         for (self.gameweek_selections[self.active_idx + 1 ..]) |*gameweek| {
             gameweek.removeFreeTransfers(1);
         }

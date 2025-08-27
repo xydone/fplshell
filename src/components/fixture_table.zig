@@ -82,7 +82,7 @@ pub fn deinit(self: Self, allocator: Allocator) void {
     self.header_names.deinit(allocator);
     allocator.destroy(self.header_names);
 }
-pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.ArrayList(Team)) !void {
+pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.ArrayList(Team), chip_active: ?Chips) !void {
     try drawInner(
         allocator,
         table_win,
@@ -90,6 +90,7 @@ pub fn draw(self: *Self, allocator: Allocator, table_win: Window, fixtures: std.
         self.table.context,
         self.start_index,
         self.end_index,
+        chip_active,
     );
 }
 
@@ -102,6 +103,7 @@ fn drawInner(
     table_ctx: *TableContext,
     start_index: u8,
     end_index: u8,
+    chip_active: ?Chips,
 ) !void {
     const fields = meta.fields(Team);
     const field_indexes = comptime allIdx: {
@@ -222,11 +224,16 @@ fn drawInner(
         col_start = 0;
         var col_idx: usize = 0;
 
-        const row_y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
+        const row_y_off: i17 = blk: {
+            const y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
+            if (row > 10) {
+                if (chip_active != .bench_boost) break :blk y_off + 1 else break :blk y_off;
+            } else break :blk y_off;
+        };
         var row_win = table_win.child(.{
             .x_off = 0,
             // add an empty space where the "Bench" would be on the lineup
-            .y_off = if (row > 10) row_y_off + 1 else row_y_off,
+            .y_off = row_y_off,
             .width = table_win.width,
             .height = 1,
         });
@@ -410,6 +417,7 @@ test "Component | Fixture Table - Set Range (clamps)" {
     };
 }
 
+const Chips = @import("../types.zig").Chips;
 const GAMEWEEK_COUNT = @import("../types.zig").GAMEWEEK_COUNT;
 
 pub const TableContext = VaxisTable.TableContext;

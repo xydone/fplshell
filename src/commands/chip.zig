@@ -32,8 +32,8 @@ fn call(params: Params) Errors!void {
     const season_selections = params.season_selections;
 
     const chip_name_token = it.next() orelse return error.EmptyChipName;
-    const chip = std.meta.stringToEnum(Chips, chip_name_token) orelse return error.InvalidChip;
-    season_selections.activateChip(chip);
+    const chip_names = std.meta.stringToEnum(Chips.Names, chip_name_token) orelse return error.InvalidChip;
+    season_selections.activateChip(chip_names.normalise());
 }
 
 pub fn handle(cmd: []const u8, params: Params) Errors!void {

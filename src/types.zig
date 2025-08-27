@@ -4,16 +4,34 @@ pub const HIT_VALUE = 4;
 
 pub const Chips = enum {
     wildcard,
-    wc,
-
     free_hit,
-    fh,
-
     bench_boost,
-    bb,
-
     triple_captain,
-    tc,
+
+    /// Includes all the chip names from the root enum and aliases
+    pub const Names = enum {
+        wildcard,
+        wc,
+
+        free_hit,
+        fh,
+
+        bench_boost,
+        bb,
+
+        triple_captain,
+        tc,
+
+        pub inline fn normalise(self: @This()) Chips {
+            return switch (self) {
+                inline .wildcard, .free_hit, .bench_boost, .triple_captain => |chip| @field(Chips, @tagName(chip)),
+                .wc => Chips.wildcard,
+                .fh => Chips.free_hit,
+                .bb => Chips.bench_boost,
+                .tc => Chips.triple_captain,
+            };
+        }
+    };
 };
 
 pub const Player = struct {

@@ -56,9 +56,10 @@ pub fn draw(
     _ = bar.printSegment(self.table.segment.?, .{ .wrap = .word });
 
     // draw team values
+    const text_offset: i17 = if (lineup.chip_active != .bench_boost) 1 else 0;
     const team_value_window = win.child(.{
         .x_off = table_win.x_off,
-        .y_off = table_win.height + 2,
+        .y_off = table_win.height + text_offset + 1,
         .width = table_win.width,
         .height = 1,
     });
@@ -69,13 +70,19 @@ pub fn draw(
     // here we go!
     const transfer_window = win.child(.{
         .x_off = table_win.x_off,
-        .y_off = table_win.height + 3,
+        .y_off = table_win.height + text_offset + 2,
         .width = table_win.width,
         .height = 1,
     });
     try drawTransfers(transfer_window, bufs.transfer_buf, lineup);
 
-    try drawInner(allocator, table_win, list, self.table.context);
+    try drawInner(
+        allocator,
+        table_win,
+        list,
+        self.table.context,
+        lineup.chip_active,
+    );
 }
 
 fn drawTeamInfo(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void {
@@ -113,6 +120,7 @@ fn drawInner(
     win: vaxis.Window,
     data_list: std.ArrayList(Player),
     table_ctx: *TableContext,
+    chip_active: ?Chips,
 ) !void {
     const fields = meta.fields(Player);
     const field_indexes = switch (table_ctx.col_indexes) {
@@ -234,10 +242,15 @@ fn drawInner(
         const item_fields = meta.fields(Player);
         var col_idx: usize = 0;
 
-        const row_y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
+        const row_y_off: i17 = blk: {
+            const y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
+            if (row > 10) {
+                if (chip_active != .bench_boost) break :blk y_off + 1 else break :blk y_off;
+            } else break :blk y_off;
+        };
         var row_win = table_win.child(.{
             .x_off = 0,
-            .y_off = if (row > 10) row_y_off + 1 else row_y_off,
+            .y_off = row_y_off,
             .width = table_win.width,
             .height = 1,
         });
@@ -246,7 +259,7 @@ fn drawInner(
         }
 
         // draw a bench line
-        if (row == 10) {
+        if (row == 10 and chip_active != .bench_boost) {
             const bench_win = table_win.child(.{
                 .x_off = 1,
                 .y_off = row_y_off + 1, // only increasing by 1 on the line before the bench to make sure this does not offset the entire table
@@ -321,6 +334,7 @@ const Color = vaxis.Cell.Color;
 pub const TableContext = Table.TableContext;
 const calcColWidth = Table.calcColWidth;
 
+const Chips = @import("../types.zig").Chips;
 const HIT_VALUE = @import("../types.zig").HIT_VALUE;
 const Player = @import("../types.zig").Player;
 const GameweekSelection = @import("../gameweek_selection.zig");

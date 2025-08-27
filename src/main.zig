@@ -629,6 +629,7 @@ pub fn main() !void {
             event_alloc,
             team_win,
             fixtures,
+            gw_selection.chip_active,
         );
 
         // bottom bar
