@@ -55,15 +55,6 @@ pub const Player = struct {
         };
     }
 
-    pub fn getTeamColor(self: Player) !struct { background: Color, foreground: Color } {
-        if (self.isEmpty()) return error.EmptyPlayer;
-        const bg = Teams.fromString(self.team_name).color();
-        return .{
-            .background = bg,
-            .foreground = Colors.getTextColor(bg),
-        };
-    }
-
     /// assumes non-null prices
     pub fn lessThan(_: void, lhs: Player, rhs: Player) bool {
         return lhs.price.? < rhs.price.?;

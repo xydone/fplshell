@@ -104,9 +104,13 @@ pub fn main() !void {
         try team_map.put(allocator, schedule.key_ptr.*, team);
     }
 
+    // get colors from config file
+    const colors = Config.ColorsFile.get(allocator) catch return error.NoColorFile;
+    defer colors.deinit();
+
     for (static_data.value.elements) |element| {
         const names = team_name_map.get(element.team) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team});
-        const bg = Teams.fromString(names.full).color();
+        const bg = Teams.fromString(names.full).color(colors.value);
         const player = Player{
             .id = element.id,
             .name = element.web_name,

@@ -3,7 +3,7 @@ team_source: union(enum) {
     file: void, // TODO: this is stupid
 },
 
-const config_path = "data/config.json";
+const config_path = "config/config.json";
 const Self = @This();
 
 pub fn get(allocator: Allocator) !std.json.Parsed(Self) {
@@ -34,10 +34,18 @@ pub const TeamFile = struct {
         value: u32,
     };
 
-    const path = "data/team.json";
+    const path = "config/team.json";
 
     pub fn get(allocator: Allocator) !std.json.Parsed(TeamFile) {
         return readFile(TeamFile, allocator, path, 1024 * 5);
+    }
+};
+
+pub const ColorsFile = struct {
+    const path = "config/team_colors.json";
+
+    pub fn get(allocator: Allocator) !std.json.Parsed([][3]u8) {
+        return readFile([][3]u8, allocator, path, 1024);
     }
 };
 
@@ -51,5 +59,6 @@ fn readFile(T: type, allocator: Allocator, path: []const u8, max_bytes: u32) !st
     });
 }
 
+const Color = @import("colors.zig").Color;
 const Allocator = std.mem.Allocator;
 const std = @import("std");

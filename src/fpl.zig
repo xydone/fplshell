@@ -24,8 +24,8 @@ pub const Teams = enum {
     @"West Ham",
     Wolves,
 
-    pub fn color(self: Teams) Color {
-        return team_colors[@intFromEnum(self)];
+    pub fn color(self: Teams, rgb_list: [][3]u8) Color {
+        return .{ .rgb = rgb_list[@intFromEnum(self)] };
     }
 
     /// Assumes valid team text, panics on missing text.
@@ -34,49 +34,6 @@ pub const Teams = enum {
             std.debug.panic("Found team name \"{s}\" which is missing from Teams enum.\n", .{text});
         };
     }
-};
-// TEAM COLORS
-const team_colors = [_]Color{
-    //  arsenal
-    .{ .rgb = .{ 168, 34, 36 } },
-    //  aston_villa
-    .{ .rgb = .{ 149, 191, 229 } },
-    //  bournemouth
-    .{ .rgb = .{ 218, 41, 28 } },
-    //  brighton
-    .{ .rgb = .{ 14, 100, 196 } },
-    //  brentford
-    .{ .rgb = .{ 181, 14, 14 } },
-    //  burnley
-    .{ .rgb = .{ 108, 29, 69 } },
-    //  chelsea
-    .{ .rgb = .{ 13, 64, 122 } },
-    //  crystal palace
-    .{ .rgb = .{ 28, 51, 92 } },
-    //  everton
-    .{ .rgb = .{ 54, 79, 138 } },
-    //  fulham
-    .{ .rgb = .{ 0, 0, 0 } },
-    //  leeds
-    .{ .rgb = .{ 255, 205, 0 } },
-    //  liverpool
-    .{ .rgb = .{ 227, 25, 38 } },
-    //  manchester city
-    .{ .rgb = .{ 108, 171, 221 } },
-    //  manchester utd
-    .{ .rgb = .{ 194, 33, 33 } },
-    //  newcastle
-    .{ .rgb = .{ 45, 41, 38 } },
-    //  forest
-    .{ .rgb = .{ 133, 17, 17 } },
-    //  sunderland
-    .{ .rgb = .{ 237, 88, 101 } },
-    //  spurs
-    .{ .rgb = .{ 181, 185, 199 } },
-    //  west ham
-    .{ .rgb = .{ 122, 38, 58 } },
-    //  wolves
-    .{ .rgb = .{ 253, 185, 19 } },
 };
 
 pub const GetStatic = struct {
