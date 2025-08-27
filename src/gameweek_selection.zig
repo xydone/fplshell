@@ -5,6 +5,7 @@ in_the_bank: f32,
 transfers_made: u8,
 free_transfers: u8,
 amount_of_hits: u8,
+chip_active: ?Chips,
 
 const Self = @This();
 
@@ -17,6 +18,7 @@ pub fn init() Self {
         .free_transfers = 0,
         .amount_of_hits = 0,
         .is_valid_formation = false,
+        .chip_active = null,
     };
 }
 
@@ -170,6 +172,28 @@ pub fn takeHit(self: *Self, amount: u8) void {
     self.amount_of_hits += amount;
 }
 
+pub fn activateChip(self: *Self, chip: Chips) void {
+    self.chip_active = chip;
+    switch (chip) {
+        .wildcard, .wc => {
+            // clear hits
+            self.amount_of_hits = 0;
+            // give unlimited transfers for this gameweek
+            self.free_transfers = 15;
+        },
+        .free_hit, .fh => {
+            // clear hits
+            self.amount_of_hits = 0;
+            // give unlimited transfers for this gameweek
+            self.free_transfers = 15;
+        },
+        .bench_boost, .bb => {},
+        .triple_captain, .tc => {},
+    }
+}
+
 const MAX_FREE_TRANSFERS = @import("types.zig").MAX_FREE_TRANSFERS;
+const Chips = @import("types.zig").Chips;
+
 const Player = @import("types.zig").Player;
 const std = @import("std");

@@ -9,6 +9,7 @@ const command_list = [_]type{
     Horizon,
     Save,
     Load,
+    Chip,
 };
 
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
@@ -424,14 +425,47 @@ pub fn main() !void {
                                                 .season_selection = season_selections,
                                             }) catch try error_message.setErrorMessage("Cannot save transfer plan!", .cmd);
                                         },
-                                        Load => {
-                                            const transfer_plan = try Load.handle(command, .{
+                                        Load => load_blk: {
+                                            const transfer_plan = Load.handle(command, .{
                                                 .it = &it,
                                                 .allocator = allocator,
                                                 .season_selection = &season_selections,
-                                            }) orelse break :cmd;
+                                            }) catch |err| switch (err) {
+                                                Load.Errors.EmptyName => {
+                                                    try error_message.setErrorMessage("Empty transfer plan name!", .cmd);
+                                                    break :load_blk;
+                                                },
+                                                Load.Errors.CannotReadFile => {
+                                                    try error_message.setErrorMessage("Cannot read transfer plan file!", .cmd);
+                                                    break :load_blk;
+                                                },
+                                                Load.Errors.CannotParseFile => {
+                                                    try error_message.setErrorMessage("Cannot parse transfer plan file!", .cmd);
+                                                    break :load_blk;
+                                                },
+                                                Load.Errors.OOM => {
+                                                    return err;
+                                                },
+                                            } orelse break :load_blk;
                                             if (loaded_transfer_plan) |lt| lt.deinit();
                                             loaded_transfer_plan = transfer_plan;
+
+                                            // update the view for rendering
+                                            gw_selection = season_selections.getActiveGameweek();
+                                        },
+                                        Chip => {
+                                            Chip.handle(command, .{
+                                                .allocator = allocator,
+                                                .season_selections = &season_selections,
+                                                .it = &it,
+                                            }) catch |err| switch (err) {
+                                                Chip.Errors.EmptyChipName => {
+                                                    try error_message.setErrorMessage("Chip name missing!", .cmd);
+                                                },
+                                                Chip.Errors.InvalidChip => {
+                                                    try error_message.setErrorMessage("Chip does not exist!", .cmd);
+                                                },
+                                            };
 
                                             // update the view for rendering
                                             gw_selection = season_selections.getActiveGameweek();
@@ -696,6 +730,7 @@ const Quit = @import("commands/quit.zig");
 const Horizon = @import("commands/horizon.zig");
 const Save = @import("commands/save.zig");
 const Load = @import("commands/load.zig");
+const Chip = @import("commands/chip.zig");
 
 const builtin = @import("builtin");
 const std = @import("std");

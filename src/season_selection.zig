@@ -49,6 +49,17 @@ pub fn insertGameweek(self: *Self, gw_selection: GameweekSelection, gw_num: u8) 
     self.gameweek_selections[gw_num] = gw_selection;
 }
 
+pub fn activateChip(self: *Self, chip: Chips) void {
+    self.gameweek_selections[self.active_idx].activateChip(chip);
+    // if its a wildcard, we also need to dock 1 free transfer from future gameweeks
+    // NOTE: wildcards can only be activated if a move is made
+    if (chip == .wildcard or chip == .wc) {
+        for (self.gameweek_selections[self.active_idx + 1 ..]) |*gameweek| {
+            gameweek.removeFreeTransfers(1);
+        }
+    }
+}
+
 //TODO: make this work with wildcards/free hits
 pub fn removePlayer(self: *Self, index: u32) void {
     const player = self.gameweek_selections[self.active_idx].players[index] orelse return;
@@ -96,6 +107,7 @@ const FixtureTable = @import("components/fixture_table.zig");
 
 const Player = @import("types.zig").Player;
 
+const Chips = @import("types.zig").Chips;
 const MAX_FREE_TRANSFERS = @import("types.zig").MAX_FREE_TRANSFERS;
 const GAMEWEEK_COUNT = @import("types.zig").GAMEWEEK_COUNT;
 const GameweekSelection = @import("gameweek_selection.zig");

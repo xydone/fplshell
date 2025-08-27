@@ -2,6 +2,20 @@ pub const GAMEWEEK_COUNT = 38;
 pub const MAX_FREE_TRANSFERS = 5;
 pub const HIT_VALUE = 4;
 
+pub const Chips = enum {
+    wildcard,
+    wc,
+
+    free_hit,
+    fh,
+
+    bench_boost,
+    bb,
+
+    triple_captain,
+    tc,
+};
+
 pub const Player = struct {
     position_name: ?[]const u8,
     name: ?[]const u8,
