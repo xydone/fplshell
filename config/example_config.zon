@@ -1,0 +1,11 @@
+.{
+    .team_source = .{
+        // NOTE: you can only have one of the fields active at the same time.
+        // if you are using one of the fields, comment it out by adding a // at the start of the line!
+
+        // if you want to use the default location ("team.json"), leave as null. you can specify a custom location too!
+        .file = null,
+        // if you want to have the team information automatically fetched, remove the comment from the following line and add your team id
+        // .id = <ADD ID HERE>
+    },
+}

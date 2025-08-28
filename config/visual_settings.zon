@@ -1,0 +1,44 @@
+.{
+    .team_colors = .{
+        //  arsenal
+        .{ 168, 34, 36 },
+        //  aston villa
+        .{ 149, 191, 229 },
+        //  bournemouth
+        .{ 218, 41, 28 },
+        //  brighton
+        .{ 14, 100, 196 },
+        //  brentford
+        .{ 181, 14, 14 },
+        //  burnley
+        .{ 108, 29, 69 },
+        //  chelsea
+        .{ 13, 64, 122 },
+        //  crystal palace
+        .{ 28, 51, 92 },
+        //  everton
+        .{ 54, 79, 138 },
+        //  fulham
+        .{ 0, 0, 0 },
+        //  leeds
+        .{ 255, 205, 0 },
+        //  liverpool
+        .{ 227, 25, 38 },
+        //  manchester city
+        .{ 108, 171, 221 },
+        //  manchester united
+        .{ 194, 33, 33 },
+        //  newcastle united
+        .{ 45, 41, 38 },
+        //  nottingham forest
+        .{ 133, 17, 17 },
+        //  sunderland
+        .{ 237, 88, 101 },
+        //  tottenham hotspurs
+        .{ 181, 185, 199 },
+        //  west ham
+        .{ 122, 38, 58 },
+        //  wolverhampton
+        .{ 253, 185, 19 },
+    },
+}

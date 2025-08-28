@@ -104,13 +104,12 @@ pub fn main() !void {
         try team_map.put(allocator, schedule.key_ptr.*, team);
     }
 
-    // get colors from config file
-    const colors = Config.ColorsFile.get(allocator) catch return error.NoColorFile;
-    defer colors.deinit();
+    const visual_settings = Config.VisualSettingsFile.get(allocator) catch return error.NoColorFile;
+    defer visual_settings.deinit(allocator);
 
     for (static_data.value.elements) |element| {
         const names = team_name_map.get(element.team) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team});
-        const bg = Teams.fromString(names.full).color(colors.value);
+        const bg = Teams.fromString(names.full).color(visual_settings.team_colors);
         const player = Player{
             .id = element.id,
             .name = element.web_name,
@@ -133,15 +132,16 @@ pub fn main() !void {
 
     season_selections.active_idx = next_gw;
 
-    var config = Config.get(allocator) catch return error.CannotReadConfigFile;
-    defer config.deinit();
+    const config = Config.get(allocator) catch return error.CannotReadConfigFile;
+    defer config.deinit(allocator);
 
-    switch (config.value.team_source) {
-        .file => file: {
+    switch (config.team_source) {
+        .file => |file| file: {
             var selection: GameweekSelection = .init();
             // if team.json doesn't exist, leave gw_selection empty
-            const team_data = Config.TeamFile.get(allocator) catch break :file;
+            const team_data = Config.TeamFile.get(allocator, file) catch break :file;
             defer team_data.deinit();
+
             for (team_data.value.picks) |pick| {
                 const player = player_map.get(pick.element);
                 if (player) |pl| {
@@ -159,7 +159,7 @@ pub fn main() !void {
                 season_selections.insertGameweek(selection, @intCast(i));
             }
         },
-        .team_id => |id| {
+        .id => |id| {
             var last_selection: ?GameweekSelection = null;
 
             var response_idx: u8 = 0;

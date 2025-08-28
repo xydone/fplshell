@@ -1,13 +1,25 @@
 team_source: union(enum) {
-    team_id: u32,
-    file: void, // TODO: this is stupid
+    id: u32,
+    file: ?[]const u8,
 },
 
-const config_path = "config/config.json";
+const config_path = "config/config.zon";
 const Self = @This();
 
-pub fn get(allocator: Allocator) !std.json.Parsed(Self) {
-    return readFile(Self, allocator, config_path, 1024);
+const log = std.log.scoped(.config);
+
+pub fn get(allocator: Allocator) !Self {
+    return readFileZon(Self, allocator, config_path, 1024 * 5) catch |err| {
+        log.err("Could not read the config file!", .{});
+        switch (err) {
+            error.ExpectedUnion => log.err("NOTE: Check if you have .file and .id uncommented at once!", .{}),
+            else => {},
+        }
+        return err;
+    };
+}
+pub fn deinit(self: Self, allocator: Allocator) void {
+    zon.parse.free(allocator, self);
 }
 
 pub const TeamFile = struct {
@@ -34,22 +46,63 @@ pub const TeamFile = struct {
         value: u32,
     };
 
-    const path = "config/team.json";
+    const config_dir = "config/";
+    const default_file_path = config_dir ++ "team.json";
 
-    pub fn get(allocator: Allocator) !std.json.Parsed(TeamFile) {
-        return readFile(TeamFile, allocator, path, 1024 * 5);
+    pub fn get(allocator: Allocator, file_path: ?[]const u8) !std.json.Parsed(TeamFile) {
+        const path = if (file_path) |file|
+            try std.fmt.allocPrint(allocator, "{s}{s}", .{ config_dir, file })
+        else
+            default_file_path;
+
+        defer if (file_path) |_| allocator.free(path);
+        return readFileJson(TeamFile, allocator, path, 1024 * 5);
     }
 };
 
-pub const ColorsFile = struct {
-    const path = "config/team_colors.json";
+pub const VisualSettingsFile = struct {
+    team_colors: [][3]u8,
 
-    pub fn get(allocator: Allocator) !std.json.Parsed([][3]u8) {
-        return readFile([][3]u8, allocator, path, 1024);
+    const path = "config/visual_settings.zon";
+
+    pub fn get(allocator: Allocator) !VisualSettingsFile {
+        return try readFileZon(VisualSettingsFile, allocator, path, 1024 * 5);
+    }
+    pub fn deinit(self: VisualSettingsFile, allocator: Allocator) void {
+        zon.parse.free(allocator, self);
     }
 };
 
-fn readFile(T: type, allocator: Allocator, path: []const u8, max_bytes: u32) !std.json.Parsed(T) {
+const ReadFileZonErrors = error{
+    CantReadFile,
+    ParseZon,
+    ExpectedUnion,
+};
+fn readFileZon(T: type, allocator: Allocator, path: []const u8, max_bytes: u32) ReadFileZonErrors!T {
+    const file = std.fs.cwd().readFileAllocOptions(
+        allocator,
+        path,
+        max_bytes,
+        null,
+        @alignOf(u8),
+        0,
+    ) catch return error.CantReadFile;
+    defer allocator.free(file);
+
+    var status: zon.parse.Status = .{};
+    defer status.deinit(allocator);
+
+    return zon.parse.fromSlice(T, allocator, file, &status, .{}) catch {
+        var error_it = status.iterateErrors();
+        log.debug("Zon parsing error status: {s}", .{status});
+        while (error_it.next()) |status_err| {
+            if (std.mem.eql(u8, "expected union", status_err.type_check.message)) return error.ExpectedUnion;
+        }
+        return error.ParseZon;
+    };
+}
+
+fn readFileJson(T: type, allocator: Allocator, path: []const u8, max_bytes: u32) !std.json.Parsed(T) {
     const file = try std.fs.cwd().readFileAlloc(allocator, path, max_bytes);
     defer allocator.free(file);
 
@@ -60,5 +113,7 @@ fn readFile(T: type, allocator: Allocator, path: []const u8, max_bytes: u32) !st
 }
 
 const Color = @import("colors.zig").Color;
+
+const zon = std.zon;
 const Allocator = std.mem.Allocator;
 const std = @import("std");
