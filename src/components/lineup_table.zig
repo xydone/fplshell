@@ -2,11 +2,7 @@ table: TableCommon,
 
 const Self = @This();
 
-pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
-    const segment = Segment{
-        .text = segment_text,
-        .style = .{},
-    };
+pub fn init(allocator: Allocator, visual_settings: VisualSettings, segment_text: []const u8) !Self {
     const context = try allocator.create(TableContext);
     context.* = .{
         .active_bg = TableCommon.active_row,
@@ -17,10 +13,7 @@ pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
         .header_names = .{ .custom = &.{ "Position", "Name", "Team", "Price" } },
         .col_indexes = .{ .by_idx = &.{ 0, 1, 2, 3 } },
     };
-    const table: TableCommon = .{
-        .segment = segment,
-        .context = context,
-    };
+    const table: TableCommon = .init(segment_text, context, visual_settings);
     return Self{
         .table = table,
     };
@@ -63,7 +56,15 @@ pub fn draw(
         .width = table_win.width,
         .height = 1,
     });
-    try drawTeamInfo(team_value_window, bufs.stats_buf, gameweek_selection);
+
+    const terminal_background_color: Color = if (self.table.visual_settings.background_color) |rgb| Color{ .rgb = rgb } else .default;
+
+    try drawTeamInfo(
+        team_value_window,
+        bufs.stats_buf,
+        gameweek_selection,
+        terminal_background_color,
+    );
 
     // draw transfers
 
@@ -80,12 +81,12 @@ pub fn draw(
         allocator,
         table_win,
         list,
-        self.table.context,
+        &self.table,
         gameweek_selection,
     );
 }
 
-fn drawTeamInfo(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void {
+fn drawTeamInfo(window: Window, buf: *[1024]u8, lineup: GameweekSelection, terminal_background_color: Color) !void {
     const seg: vaxis.Cell.Segment = .{
         .text = try std.fmt.bufPrint(buf, "TV: {d:.1} | ITB: {d:.1} {s}", .{
             lineup.lineup_value,
@@ -93,7 +94,7 @@ fn drawTeamInfo(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void
             if (lineup.is_valid_formation) "" else "| Invalid formation!",
         }),
 
-        .style = .{ .fg = .default, .bg = .default },
+        .style = .{ .fg = .default, .bg = terminal_background_color },
     };
 
     _ = window.printSegment(seg, .{});
@@ -137,11 +138,13 @@ fn drawInner(
     /// The parent Window to draw to.
     win: vaxis.Window,
     data_list: std.ArrayList(Player),
-    table_ctx: *TableContext,
+    table_common: *TableCommon,
     gameweek_selection: GameweekSelection,
 ) !void {
+    const terminal_background_color: Color = if (table_common.visual_settings.background_color) |rgb| Color{ .rgb = rgb } else .default;
+
     const fields = meta.fields(Player);
-    const field_indexes = switch (table_ctx.col_indexes) {
+    const field_indexes = switch (table_common.context.col_indexes) {
         .all => comptime allIdx: {
             var indexes_buf: [fields.len]usize = undefined;
             for (0..fields.len) |idx| indexes_buf[idx] = idx;
@@ -154,7 +157,7 @@ fn drawInner(
     // Headers for the Table
     var hdrs_buf: [fields.len][]const u8 = undefined;
     const headers = hdrs: {
-        switch (table_ctx.header_names) {
+        switch (table_common.context.header_names) {
             .field_names => {
                 for (field_indexes) |f_idx| {
                     inline for (fields, 0..) |field, idx| {
@@ -169,38 +172,40 @@ fn drawInner(
     };
 
     const table_win = win.child(.{
-        .y_off = table_ctx.y_off,
+        .y_off = table_common.context.y_off,
         .width = win.width,
         .height = win.height,
     });
 
     // Headers
-    if (table_ctx.col > headers.len - 1) table_ctx.col = @intCast(headers.len - 1);
+    if (table_common.context.col > headers.len - 1) table_common.context.col = @intCast(headers.len - 1);
     var col_start: u16 = 0;
     for (headers[0..], 0..) |hdr_txt, idx| {
         const col_width = try calcColWidth(
             @intCast(idx),
             headers,
-            table_ctx.col_width,
+            table_common.context.col_width,
             table_win,
         );
         defer col_start += col_width;
         const hdr_fg, const hdr_bg = hdrColors: {
-            if (table_ctx.active and idx == table_ctx.col)
-                break :hdrColors .{ table_ctx.active_fg, table_ctx.active_bg }
+            if (table_common.context.active and idx == table_common.context.col)
+                break :hdrColors .{ table_common.context.active_fg, table_common.context.active_bg }
             else if (idx % 2 == 0)
-                break :hdrColors .{ .default, table_ctx.hdr_bg_1 }
+                break :hdrColors .{ .default, table_common.context.hdr_bg_1 }
             else
-                break :hdrColors .{ .default, table_ctx.hdr_bg_2 };
+                break :hdrColors .{ .default, table_common.context.hdr_bg_2 };
         };
         const hdr_win = table_win.child(.{
             .x_off = col_start,
             .y_off = 0,
             .width = col_width,
             .height = 1,
-            .border = .{ .where = if (table_ctx.header_borders and idx > 0) .left else .none },
+            .border = .{
+                .where = if (table_common.context.header_borders and idx > 0) .left else .none,
+            },
         });
-        var hdr = switch (table_ctx.header_align) {
+        var hdr = switch (table_common.context.header_align) {
             .left => hdr_win,
             .center => vaxis.widgets.alignment.center(hdr_win, @min(col_width -| 1, hdr_txt.len +| 1), 1),
         };
@@ -211,49 +216,49 @@ fn drawInner(
                 .fg = hdr_fg,
                 .bg = hdr_bg,
                 .bold = true,
-                .ul_style = if (idx == table_ctx.col) .single else .dotted,
+                .ul_style = if (idx == table_common.context.col) .single else .dotted,
             },
         }};
         _ = hdr.print(seg[0..], .{ .wrap = .word });
     }
 
     // Rows
-    if (table_ctx.active_content_fn == null) table_ctx.active_y_off = 0;
+    if (table_common.context.active_content_fn == null) table_common.context.active_y_off = 0;
     const max_items: u16 =
         if (data_list.items.len > table_win.height -| 1) table_win.height -| 1 else @intCast(data_list.items.len);
-    var end = table_ctx.start + max_items;
-    if (table_ctx.row + table_ctx.active_y_off >= win.height -| 2)
-        end -|= table_ctx.active_y_off;
+    var end = table_common.context.start + max_items;
+    if (table_common.context.row + table_common.context.active_y_off >= win.height -| 2)
+        end -|= table_common.context.active_y_off;
     if (end > data_list.items.len) end = @intCast(data_list.items.len);
-    table_ctx.start = tableStart: {
-        if (table_ctx.row == 0)
+    table_common.context.start = tableStart: {
+        if (table_common.context.row == 0)
             break :tableStart 0;
-        if (table_ctx.row < table_ctx.start)
-            break :tableStart table_ctx.start - (table_ctx.start - table_ctx.row);
-        if (table_ctx.row >= data_list.items.len - 1)
-            table_ctx.row = @intCast(data_list.items.len - 1);
-        if (table_ctx.row >= end)
-            break :tableStart table_ctx.start + (table_ctx.row - end + 1);
-        break :tableStart table_ctx.start;
+        if (table_common.context.row < table_common.context.start)
+            break :tableStart table_common.context.start - (table_common.context.start - table_common.context.row);
+        if (table_common.context.row >= data_list.items.len - 1)
+            table_common.context.row = @intCast(data_list.items.len - 1);
+        if (table_common.context.row >= end)
+            break :tableStart table_common.context.start + (table_common.context.row - end + 1);
+        break :tableStart table_common.context.start;
     };
-    end = table_ctx.start + max_items;
-    if (table_ctx.row + table_ctx.active_y_off >= win.height -| 2)
-        end -|= table_ctx.active_y_off;
+    end = table_common.context.start + max_items;
+    if (table_common.context.row + table_common.context.active_y_off >= win.height -| 2)
+        end -|= table_common.context.active_y_off;
     if (end > data_list.items.len) end = @intCast(data_list.items.len);
-    table_ctx.start = @min(table_ctx.start, end);
-    table_ctx.active_y_off = 0;
-    for (data_list.items[table_ctx.start..end], 0..) |player, row| {
+    table_common.context.start = @min(table_common.context.start, end);
+    table_common.context.active_y_off = 0;
+    for (data_list.items[table_common.context.start..end], 0..) |player, row| {
         const is_captain = if (gameweek_selection.captain_idx) |idx| idx == row else false;
         const is_vice_captain = if (gameweek_selection.vice_captain_idx) |idx| idx == row else false;
         const row_fg, const row_bg = rowColors: {
             const fg = player.foreground_color orelse .default;
-            const bg = player.background_color orelse table_ctx.row_bg_1;
+            const bg = player.background_color orelse table_common.context.row_bg_1;
 
-            if (table_ctx.active and table_ctx.start + row == table_ctx.row)
-                break :rowColors .{ table_ctx.active_fg, Colors.brighten(bg, 50) };
-            if (table_ctx.sel_rows) |rows| {
-                if (mem.indexOfScalar(u16, rows, @intCast(table_ctx.start + row)) != null)
-                    break :rowColors .{ table_ctx.selected_fg, Colors.darken(bg, 80) };
+            if (table_common.context.active and table_common.context.start + row == table_common.context.row)
+                break :rowColors .{ table_common.context.active_fg, Colors.brighten(bg, 50) };
+            if (table_common.context.sel_rows) |rows| {
+                if (mem.indexOfScalar(u16, rows, @intCast(table_common.context.start + row)) != null)
+                    break :rowColors .{ table_common.context.selected_fg, Colors.darken(bg, 80) };
             }
             break :rowColors .{ fg, bg };
         };
@@ -263,7 +268,7 @@ fn drawInner(
         var col_idx: usize = 0;
 
         const row_y_off: i17 = blk: {
-            const y_off: i17 = @intCast(1 + row + table_ctx.active_y_off);
+            const y_off: i17 = @intCast(1 + row + table_common.context.active_y_off);
             if (row > 10) {
                 if (gameweek_selection.chip_active != .bench_boost) break :blk y_off + 1 else break :blk y_off;
             } else break :blk y_off;
@@ -274,8 +279,8 @@ fn drawInner(
             .width = table_win.width,
             .height = 1,
         });
-        if (table_ctx.start + row == table_ctx.row) {
-            table_ctx.active_y_off = if (table_ctx.active_content_fn) |content| try content(&row_win, table_ctx.active_ctx) else 0;
+        if (table_common.context.start + row == table_common.context.row) {
+            table_common.context.active_y_off = if (table_common.context.active_content_fn) |content| try content(&row_win, table_common.context.active_ctx) else 0;
         }
 
         // draw a bench line
@@ -289,7 +294,7 @@ fn drawInner(
 
             const segment = Segment{
                 .text = "Bench",
-                .style = .{},
+                .style = .{ .bg = terminal_background_color },
             };
             _ = bench_win.printSegment(segment, .{ .wrap = .word });
         }
@@ -313,7 +318,7 @@ fn drawInner(
         }
         for (field_indexes) |f_idx| {
             inline for (item_fields[0..], 0..) |item_field, item_idx| contFields: {
-                switch (table_ctx.col_indexes) {
+                switch (table_common.context.col_indexes) {
                     .all => {},
                     .by_idx => {
                         if (item_idx != f_idx) break :contFields;
@@ -323,7 +328,7 @@ fn drawInner(
                 const col_width = try calcColWidth(
                     item_idx,
                     headers,
-                    table_ctx.col_width,
+                    table_common.context.col_width,
                     table_win,
                 );
                 defer col_start += col_width;
@@ -335,12 +340,14 @@ fn drawInner(
                     .y_off = 0,
                     .width = col_width,
                     .height = 1,
-                    .border = .{ .where = if (table_ctx.col_borders and col_idx > 0) .left else .none },
+                    .border = .{
+                        .where = if (table_common.context.col_borders and col_idx > 0) .left else .none,
+                    },
                 });
                 const item_txt = try TableCommon.getCellString(allocator.?, ItemT, item);
                 item_win.fill(.{ .style = .{ .bg = row_bg } });
                 const item_align_win = itemAlignWin: {
-                    const col_align = switch (table_ctx.col_align) {
+                    const col_align = switch (table_common.context.col_align) {
                         .all => |all| all,
                         .by_idx => |aligns| aligns[col_idx],
                     };
@@ -358,11 +365,13 @@ fn drawInner(
                     .text = if (item_txt.len > col_width and allocator != null) try fmt.allocPrint(allocator.?, "{s}...", .{item_txt[0..(col_width -| 4)]}) else item_txt,
                     .style = .{ .fg = row_fg, .bg = row_bg },
                 };
-                _ = item_align_win.printSegment(seg, .{ .wrap = .word, .col_offset = table_ctx.cell_x_off });
+                _ = item_align_win.printSegment(seg, .{ .wrap = .word, .col_offset = table_common.context.cell_x_off });
             }
         }
     }
 }
+
+const VisualSettings = @import("../config.zig").VisualSettingsFile;
 
 const vaxis = @import("vaxis");
 const Window = vaxis.Window;

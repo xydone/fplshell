@@ -11,7 +11,7 @@ end_index: u8,
 const Self = @This();
 
 /// Clamps to valid gameweeks
-pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
+pub fn init(allocator: Allocator, visual_settings: VisualSettings, first_gw: u8, last_gw: u8) !Self {
     const first = std.math.clamp(first_gw, 1, GAMEWEEK_COUNT);
     const last = std.math.clamp(last_gw, 1, GAMEWEEK_COUNT);
     const gameweek_count = last - first + 1;
@@ -32,10 +32,7 @@ pub fn init(allocator: Allocator, first_gw: u8, last_gw: u8) !Self {
         .selected_bg = selected_row,
         .header_names = .{ .custom = header_names.items },
     };
-    const table = TableCommon{
-        .segment = null,
-        .context = context,
-    };
+    const table: TableCommon = .init(null, context, visual_settings);
 
     return Self{
         .table = table,
@@ -416,6 +413,8 @@ test "Component | Fixture Table - Set Range (clamps)" {
         return err;
     };
 }
+
+const VisualSettings = @import("../config.zig").VisualSettingsFile;
 
 const Chips = @import("../types.zig").Chips;
 const GAMEWEEK_COUNT = @import("../types.zig").GAMEWEEK_COUNT;

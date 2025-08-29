@@ -62,6 +62,7 @@ pub const TeamFile = struct {
 
 pub const VisualSettingsFile = struct {
     team_colors: [][3]u8,
+    background_color: ?[3]u8,
 
     const path = "config/visual_settings.zon";
 

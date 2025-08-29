@@ -2,11 +2,7 @@ table: TableCommon,
 
 const Self = @This();
 
-pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
-    const segment = Segment{
-        .text = segment_text,
-        .style = .{},
-    };
+pub fn init(allocator: Allocator, visual_settings: VisualSettings, segment_text: []const u8) !Self {
     const context = try allocator.create(TableContext);
     context.* = .{
         .active_bg = TableCommon.active_row,
@@ -17,10 +13,7 @@ pub fn init(allocator: Allocator, segment_text: []const u8) !Self {
         .header_names = .{ .custom = &.{ "Position", "Name", "Team", "Price" } },
         .col_indexes = .{ .by_idx = &.{ 0, 1, 2, 3 } },
     };
-    const table: TableCommon = .{
-        .segment = segment,
-        .context = context,
-    };
+    const table: TableCommon = .init(segment_text, context, visual_settings);
     return Self{
         .table = table,
     };
@@ -234,6 +227,8 @@ fn drawInner(
         }
     }
 }
+
+const VisualSettings = @import("../config.zig").VisualSettingsFile;
 
 const vaxis = @import("vaxis");
 const Window = vaxis.Window;

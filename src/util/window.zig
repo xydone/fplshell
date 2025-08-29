@@ -1,6 +1,7 @@
 pub const Options = struct {
     /// location of border, by default all sides
     locations: Locations = all_selected,
+    terminal_background_color: Color = .default,
 
     pub const all_selected: Locations = .{ .bottom = true, .top = true, .left = true, .right = true };
 };
@@ -31,6 +32,7 @@ pub fn createChild(context: Context, options: Options) vaxis.Window {
             child_window.height = (child_window.height orelse 0) + 2;
             child_window.border = .{
                 .where = .{ .other = options.locations },
+                .style = .{ .bg = options.terminal_background_color },
             };
 
             // early exit if we've found the menu from the options
@@ -45,5 +47,6 @@ const Menu = @import("../components/menus.zig").Menu;
 const Locations = Window.BorderOptions.Locations;
 const ChildOptions = Window.ChildOptions;
 const Window = vaxis.Window;
+const Color = vaxis.Color;
 const vaxis = @import("vaxis");
 const std = @import("std");

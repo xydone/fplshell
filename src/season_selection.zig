@@ -5,7 +5,7 @@ active_idx: u8,
 
 const Self = @This();
 
-pub fn init(allocator: Allocator, range: u8) !Self {
+pub fn init(allocator: Allocator, visual_settings: VisualSettings, range: u8) !Self {
     // const gameweek_selections = [_]GameweekSelection{GameweekSelection.init()} ** GAMEWEEK_COUNT;
     const gameweek_selections = try allocator.create([GAMEWEEK_COUNT]GameweekSelection);
     for (gameweek_selections) |*gw_selection| {
@@ -13,7 +13,7 @@ pub fn init(allocator: Allocator, range: u8) !Self {
     }
     var fixture_tables: [GAMEWEEK_COUNT]FixtureTable = undefined;
     for (0..GAMEWEEK_COUNT) |i| {
-        fixture_tables[i] = try .init(allocator, @intCast(i + 1), @intCast(i + 1 + range));
+        fixture_tables[i] = try .init(allocator, visual_settings, @intCast(i + 1), @intCast(i + 1 + range));
     }
     return .{
         .gameweek_selections = gameweek_selections,
@@ -114,6 +114,8 @@ pub fn swapPlayers(self: *Self, first_idx: u16, second_idx: u16) void {
     );
     self.gameweek_selections[self.active_idx].is_valid_formation = self.gameweek_selections[self.active_idx].isValidFormation();
 }
+
+const VisualSettings = @import("config.zig").VisualSettingsFile;
 
 const FixtureTable = @import("components/fixture_table.zig");
 

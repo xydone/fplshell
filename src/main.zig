@@ -127,7 +127,11 @@ pub fn main() !void {
     }
 
     // read team data from config
-    var season_selections: SeasonSelection = try .init(allocator, 5);
+    var season_selections: SeasonSelection = try .init(
+        allocator,
+        visual_settings,
+        5,
+    );
     defer season_selections.deinit(allocator);
 
     season_selections.active_idx = next_gw;
@@ -240,11 +244,15 @@ pub fn main() !void {
     var event_arena = std.heap.ArenaAllocator.init(allocator);
     defer event_arena.deinit();
 
-    var search_table = try PlayerTable.init(allocator, "Select a player");
+    var search_table: PlayerTable = try .init(
+        allocator,
+        visual_settings,
+        "Select a player",
+    );
     defer search_table.deinit(allocator);
     search_table.table.makeActive();
 
-    var selected = try LineupTable.init(allocator, "Selected players");
+    var selected = try LineupTable.init(allocator, visual_settings, "Selected players");
     defer selected.deinit(allocator);
 
     var active_menu: Menu = .search_table;
@@ -547,6 +555,15 @@ pub fn main() !void {
 
         win.clear();
 
+        // apply a background if provided
+        const terminal_background_color: Color = blk: {
+            if (visual_settings.background_color) |rgb| {
+                win.fill(.{ .style = .{ .bg = .{ .rgb = rgb } } });
+                break :blk Color{ .rgb = rgb };
+            }
+            break :blk .default;
+        };
+
         const ROWS_PER_TABLE = 15;
         // running total of current offsets
         var x_off: i17 = 1;
@@ -563,7 +580,9 @@ pub fn main() !void {
             .window = win,
             .active_menu = active_menu,
             .border_menus = &search_table_border_menus,
-        }, .{});
+        }, .{
+            .terminal_background_color = terminal_background_color,
+        });
 
         try search_table.draw(
             event_alloc,
@@ -588,6 +607,7 @@ pub fn main() !void {
         }, .{
             // everywhere except on the right
             .locations = .{ .left = true, .top = true, .bottom = true },
+            .terminal_background_color = terminal_background_color,
         });
 
         var stats_buf: [1024]u8 = undefined;
@@ -620,6 +640,7 @@ pub fn main() !void {
         }, .{
             // if the active menu is the selected table, draw the remainder of the border on here, else default.
             .locations = if (active_menu == .selected) .{ .right = true, .top = true, .bottom = true } else CreateChildOptions.all_selected,
+            .terminal_background_color = terminal_background_color,
         });
         var team_buf: [15]Team = undefined;
 
@@ -702,6 +723,7 @@ const Config = @import("config.zig");
 
 const vaxis = @import("vaxis");
 const TextInput = vaxis.widgets.TextInput;
+const Color = vaxis.Color;
 const Key = vaxis.Key;
 const TableContext = vaxis.widgets.Table.TableContext;
 

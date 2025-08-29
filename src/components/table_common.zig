@@ -1,28 +1,20 @@
-const std = @import("std");
-const fmt = std.fmt;
-const heap = std.heap;
-const mem = std.mem;
-const meta = std.meta;
-const Allocator = std.mem.Allocator;
-
-const vaxis = @import("vaxis");
-const Window = vaxis.Window;
-const Segment = vaxis.Cell.Segment;
-const Table = vaxis.widgets.Table;
-const Color = vaxis.Cell.Color;
-
-pub const TableContext = Table.TableContext;
-const calcColWidth = Table.calcColWidth;
-
-const Player = @import("../types.zig").Player;
-const GameweekSelection = @import("../gameweek_selection.zig");
-
-const Colors = @import("../colors.zig");
-
 segment: ?Segment,
 context: *TableContext,
+visual_settings: VisualSettings,
 
 const Self = @This();
+
+pub fn init(segment_text: ?[]const u8, context: *TableContext, visual_settings: VisualSettings) Self {
+    const segment: ?Segment = if (segment_text) |text| .{
+        .text = text,
+        .style = .{ .bg = if (visual_settings.background_color) |rgb| Color{ .rgb = rgb } else .default },
+    } else null;
+    return .{
+        .segment = segment,
+        .context = context,
+        .visual_settings = visual_settings,
+    };
+}
 
 // Colors
 pub const active_row: Color = Colors.light_blue;
@@ -87,3 +79,26 @@ pub fn getCellString(allocator: Allocator, ItemType: anytype, item: anytype) ![]
         },
     };
 }
+
+const VisualSettings = @import("../config.zig").VisualSettingsFile;
+
+const vaxis = @import("vaxis");
+const Window = vaxis.Window;
+const Segment = vaxis.Cell.Segment;
+const Table = vaxis.widgets.Table;
+const Color = vaxis.Cell.Color;
+
+pub const TableContext = Table.TableContext;
+const calcColWidth = Table.calcColWidth;
+
+const Player = @import("../types.zig").Player;
+const GameweekSelection = @import("../gameweek_selection.zig");
+
+const Colors = @import("../colors.zig");
+
+const std = @import("std");
+const fmt = std.fmt;
+const heap = std.heap;
+const mem = std.mem;
+const meta = std.meta;
+const Allocator = std.mem.Allocator;
