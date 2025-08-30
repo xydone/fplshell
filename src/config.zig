@@ -60,9 +60,16 @@ pub const TeamFile = struct {
     }
 };
 
+pub const VisualSettings = struct {
+    team_colors: [][3]u8,
+    background_color: Color,
+    font_color: Color,
+};
+
 pub const VisualSettingsFile = struct {
     team_colors: [][3]u8,
     background_color: ?[3]u8,
+    font_color: ?[3]u8,
 
     const path = "config/visual_settings.zon";
 
@@ -71,6 +78,14 @@ pub const VisualSettingsFile = struct {
     }
     pub fn deinit(self: VisualSettingsFile, allocator: Allocator) void {
         zon.parse.free(allocator, self);
+    }
+
+    pub fn toVisualSettings(self: VisualSettingsFile) VisualSettings {
+        return .{
+            .team_colors = self.team_colors,
+            .background_color = if (self.background_color) |rgb| Color{ .rgb = rgb } else .default,
+            .font_color = if (self.background_color) |rgb| Color{ .rgb = rgb } else .default,
+        };
     }
 };
 

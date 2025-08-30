@@ -115,7 +115,7 @@ pub fn swapPlayers(self: *Self, first_idx: u16, second_idx: u16) void {
     self.gameweek_selections[self.active_idx].is_valid_formation = self.gameweek_selections[self.active_idx].isValidFormation();
 }
 
-const VisualSettings = @import("config.zig").VisualSettingsFile;
+const VisualSettings = @import("config.zig").VisualSettings;
 
 const FixtureTable = @import("components/fixture_table.zig");
 

@@ -7,7 +7,10 @@ const Self = @This();
 pub fn init(segment_text: ?[]const u8, context: *TableContext, visual_settings: VisualSettings) Self {
     const segment: ?Segment = if (segment_text) |text| .{
         .text = text,
-        .style = .{ .bg = if (visual_settings.background_color) |rgb| Color{ .rgb = rgb } else .default },
+        .style = .{
+            .bg = visual_settings.background_color,
+            .fg = visual_settings.font_color,
+        },
     } else null;
     return .{
         .segment = segment,
@@ -80,7 +83,7 @@ pub fn getCellString(allocator: Allocator, ItemType: anytype, item: anytype) ![]
     };
 }
 
-const VisualSettings = @import("../config.zig").VisualSettingsFile;
+const VisualSettings = @import("../config.zig").VisualSettings;
 
 const vaxis = @import("vaxis");
 const Window = vaxis.Window;

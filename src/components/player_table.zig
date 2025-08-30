@@ -228,7 +228,7 @@ fn drawInner(
     }
 }
 
-const VisualSettings = @import("../config.zig").VisualSettingsFile;
+const VisualSettings = @import("../config.zig").VisualSettings;
 
 const vaxis = @import("vaxis");
 const Window = vaxis.Window;

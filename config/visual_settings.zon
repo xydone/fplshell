@@ -1,5 +1,6 @@
 .{
     .background_color = null,
+    .font_color = null,
     .team_colors = .{
         //  arsenal
         .{ 168, 34, 36 },

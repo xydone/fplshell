@@ -414,7 +414,7 @@ test "Component | Fixture Table - Set Range (clamps)" {
     };
 }
 
-const VisualSettings = @import("../config.zig").VisualSettingsFile;
+const VisualSettings = @import("../config.zig").VisualSettings;
 
 const Chips = @import("../types.zig").Chips;
 const GAMEWEEK_COUNT = @import("../types.zig").GAMEWEEK_COUNT;

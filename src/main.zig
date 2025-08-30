@@ -104,8 +104,10 @@ pub fn main() !void {
         try team_map.put(allocator, schedule.key_ptr.*, team);
     }
 
-    const visual_settings = Config.VisualSettingsFile.get(allocator) catch return error.NoColorFile;
-    defer visual_settings.deinit(allocator);
+    const visual_settings_file = Config.VisualSettingsFile.get(allocator) catch return error.NoColorFile;
+    defer visual_settings_file.deinit(allocator);
+
+    const visual_settings = visual_settings_file.toVisualSettings();
 
     for (static_data.value.elements) |element| {
         const names = team_name_map.get(element.team) orelse std.debug.panic("Team code {d} not found in team map!", .{element.team});
@@ -556,13 +558,11 @@ pub fn main() !void {
         win.clear();
 
         // apply a background if provided
-        const terminal_background_color: Color = blk: {
-            if (visual_settings.background_color) |rgb| {
-                win.fill(.{ .style = .{ .bg = .{ .rgb = rgb } } });
-                break :blk Color{ .rgb = rgb };
-            }
-            break :blk .default;
-        };
+        if (visual_settings_file.background_color) |_| {
+            win.fill(.{ .style = .{
+                .bg = visual_settings.background_color,
+            } });
+        }
 
         const ROWS_PER_TABLE = 15;
         // running total of current offsets
@@ -581,7 +581,7 @@ pub fn main() !void {
             .active_menu = active_menu,
             .border_menus = &search_table_border_menus,
         }, .{
-            .terminal_background_color = terminal_background_color,
+            .terminal_background_color = visual_settings.background_color,
         });
 
         try search_table.draw(
@@ -607,7 +607,7 @@ pub fn main() !void {
         }, .{
             // everywhere except on the right
             .locations = .{ .left = true, .top = true, .bottom = true },
-            .terminal_background_color = terminal_background_color,
+            .terminal_background_color = visual_settings.background_color,
         });
 
         var stats_buf: [1024]u8 = undefined;
@@ -640,7 +640,7 @@ pub fn main() !void {
         }, .{
             // if the active menu is the selected table, draw the remainder of the border on here, else default.
             .locations = if (active_menu == .selected) .{ .right = true, .top = true, .bottom = true } else CreateChildOptions.all_selected,
-            .terminal_background_color = terminal_background_color,
+            .terminal_background_color = visual_settings.background_color,
         });
         var team_buf: [15]Team = undefined;
 

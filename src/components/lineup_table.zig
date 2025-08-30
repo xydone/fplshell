@@ -57,13 +57,10 @@ pub fn draw(
         .height = 1,
     });
 
-    const terminal_background_color: Color = if (self.table.visual_settings.background_color) |rgb| Color{ .rgb = rgb } else .default;
-
-    try drawTeamInfo(
+    try self.drawTeamInfo(
         team_value_window,
         bufs.stats_buf,
         gameweek_selection,
-        terminal_background_color,
     );
 
     // draw transfers
@@ -75,7 +72,11 @@ pub fn draw(
         .width = table_win.width,
         .height = 1,
     });
-    try drawTransfers(transfer_window, bufs.transfer_buf, gameweek_selection);
+    try self.drawTransfers(
+        transfer_window,
+        bufs.transfer_buf,
+        gameweek_selection,
+    );
 
     try drawInner(
         allocator,
@@ -86,7 +87,7 @@ pub fn draw(
     );
 }
 
-fn drawTeamInfo(window: Window, buf: *[1024]u8, lineup: GameweekSelection, terminal_background_color: Color) !void {
+fn drawTeamInfo(self: Self, window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void {
     const seg: vaxis.Cell.Segment = .{
         .text = try std.fmt.bufPrint(buf, "TV: {d:.1} | ITB: {d:.1} {s}", .{
             lineup.lineup_value,
@@ -94,13 +95,16 @@ fn drawTeamInfo(window: Window, buf: *[1024]u8, lineup: GameweekSelection, termi
             if (lineup.is_valid_formation) "" else "| Invalid formation!",
         }),
 
-        .style = .{ .fg = .default, .bg = terminal_background_color },
+        .style = .{
+            .fg = .default,
+            .bg = self.table.visual_settings.background_color,
+        },
     };
 
     _ = window.printSegment(seg, .{});
 }
 
-fn drawTransfers(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void {
+fn drawTransfers(self: Self, window: Window, buf: *[1024]u8, lineup: GameweekSelection) !void {
     const seg: vaxis.Cell.Segment = .{
         .text = try std.fmt.bufPrint(buf, "FT: {s} | TM: {} | Cost: {} {s}", .{
             blk: {
@@ -126,7 +130,10 @@ fn drawTransfers(window: Window, buf: *[1024]u8, lineup: GameweekSelection) !voi
             } else "",
         }),
 
-        .style = .{ .fg = .default, .bg = .default },
+        .style = .{
+            .fg = .default,
+            .bg = self.table.visual_settings.background_color,
+        },
     };
 
     _ = window.printSegment(seg, .{});
@@ -141,8 +148,6 @@ fn drawInner(
     table_common: *TableCommon,
     gameweek_selection: GameweekSelection,
 ) !void {
-    const terminal_background_color: Color = if (table_common.visual_settings.background_color) |rgb| Color{ .rgb = rgb } else .default;
-
     const fields = meta.fields(Player);
     const field_indexes = switch (table_common.context.col_indexes) {
         .all => comptime allIdx: {
@@ -294,7 +299,7 @@ fn drawInner(
 
             const segment = Segment{
                 .text = "Bench",
-                .style = .{ .bg = terminal_background_color },
+                .style = .{ .bg = table_common.visual_settings.background_color },
             };
             _ = bench_win.printSegment(segment, .{ .wrap = .word });
         }
@@ -371,7 +376,7 @@ fn drawInner(
     }
 }
 
-const VisualSettings = @import("../config.zig").VisualSettingsFile;
+const VisualSettings = @import("../config.zig").VisualSettings;
 
 const vaxis = @import("vaxis");
 const Window = vaxis.Window;
