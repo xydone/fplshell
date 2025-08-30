@@ -5,11 +5,11 @@ const Self = @This();
 pub fn init(allocator: Allocator, visual_settings: VisualSettings, segment_text: []const u8) !Self {
     const context = try allocator.create(TableContext);
     context.* = .{
-        .active_bg = TableCommon.active_row,
+        .active_bg = visual_settings.table_colors.active_row,
         .active_fg = .{ .rgb = .{ 0, 0, 0 } },
-        .row_bg_1 = TableCommon.normal_table,
-        .row_bg_2 = TableCommon.normal_table,
-        .selected_bg = TableCommon.selected_row,
+        .row_bg_1 = visual_settings.table_colors.not_selected,
+        .row_bg_2 = visual_settings.table_colors.not_selected,
+        .selected_bg = visual_settings.table_colors.selected,
         .header_names = .{ .custom = &.{ "Position", "Name", "Team", "Price" } },
         .col_indexes = .{ .by_idx = &.{ 0, 1, 2, 3 } },
     };

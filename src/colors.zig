@@ -2,22 +2,10 @@ const std = @import("std");
 const vaxis = @import("vaxis");
 pub const Color = vaxis.Cell.Color;
 
-pub const dark_blue: Color = .{ .rgb = .{ 24, 95, 122 } };
-pub const light_blue: Color = .{ .rgb = .{ 50, 133, 166 } };
-
-pub const dark_red: Color = .{ .rgb = .{ 87, 3, 18 } };
-pub const light_red: Color = .{ .rgb = .{ 227, 43, 75 } };
-
-pub const black: Color = .{ .rgb = .{ 0, 0, 0 } };
-pub const white: Color = .{ .rgb = .{ 255, 255, 255 } };
-
-pub const light_gray: Color = .{ .rgb = .{ 182, 182, 182 } };
-pub const gray: Color = .{ .rgb = .{ 124, 124, 124 } };
-
-pub const captain: Color = .{ .rgb = .{ 239, 191, 4 } };
-pub const vice_captain: Color = .{ .rgb = .{ 196, 196, 196 } };
-
 pub fn getTextColor(color: Color) Color {
+    const black: Color = .{ .rgb = .{ 0, 0, 0 } };
+    const white: Color = .{ .rgb = .{ 255, 255, 255 } };
+
     const r = color.rgb[0];
     const g = color.rgb[1];
     const b = color.rgb[2];

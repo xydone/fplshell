@@ -1,8 +1,3 @@
-const active_row = TableCommon.active_row;
-const selected_row = TableCommon.selected_row;
-const selected_table = TableCommon.selected_table;
-const normal_table = TableCommon.normal_table;
-
 table: TableCommon,
 header_names: *std.ArrayListUnmanaged([]u8),
 start_index: u8,
@@ -25,11 +20,11 @@ pub fn init(allocator: Allocator, visual_settings: VisualSettings, first_gw: u8,
 
     const context = try allocator.create(TableContext);
     context.* = .{
-        .active_bg = active_row,
+        .active_bg = visual_settings.table_colors.active_row,
         .active_fg = .{ .rgb = .{ 0, 0, 0 } },
-        .row_bg_1 = normal_table,
-        .row_bg_2 = normal_table,
-        .selected_bg = selected_row,
+        .row_bg_1 = visual_settings.table_colors.not_selected,
+        .row_bg_2 = visual_settings.table_colors.not_selected,
+        .selected_bg = visual_settings.table_colors.selected,
         .header_names = .{ .custom = header_names.items },
     };
     const table: TableCommon = .init(null, context, visual_settings);

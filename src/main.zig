@@ -212,7 +212,7 @@ pub fn main() !void {
         descriptions[i] = cmd.description;
     }
 
-    var command_helper: CommandHelper = .init(&descriptions);
+    var command_helper: CommandHelper = .init(&descriptions, visual_settings);
 
     // Terminal stuff
 
@@ -558,9 +558,9 @@ pub fn main() !void {
         win.clear();
 
         // apply a background if provided
-        if (visual_settings_file.background_color) |_| {
+        if (visual_settings_file.terminal_colors.background) |_| {
             win.fill(.{ .style = .{
-                .bg = visual_settings.background_color,
+                .bg = visual_settings.terminal_colors.background,
             } });
         }
 
@@ -581,7 +581,7 @@ pub fn main() !void {
             .active_menu = active_menu,
             .border_menus = &search_table_border_menus,
         }, .{
-            .terminal_background_color = visual_settings.background_color,
+            .terminal_background_color = visual_settings.terminal_colors.background,
         });
 
         try search_table.draw(
@@ -607,7 +607,7 @@ pub fn main() !void {
         }, .{
             // everywhere except on the right
             .locations = .{ .left = true, .top = true, .bottom = true },
-            .terminal_background_color = visual_settings.background_color,
+            .terminal_background_color = visual_settings.terminal_colors.background,
         });
 
         var stats_buf: [1024]u8 = undefined;
@@ -640,7 +640,7 @@ pub fn main() !void {
         }, .{
             // if the active menu is the selected table, draw the remainder of the border on here, else default.
             .locations = if (active_menu == .selected) .{ .right = true, .top = true, .bottom = true } else CreateChildOptions.all_selected,
-            .terminal_background_color = visual_settings.background_color,
+            .terminal_background_color = visual_settings.terminal_colors.background,
         });
         var team_buf: [15]Team = undefined;
 
@@ -670,8 +670,8 @@ pub fn main() !void {
                 .width = win.width,
                 .height = 1,
             });
-            bottom_bar.fill(.{ .style = .{ .bg = Colors.light_blue } });
-            cmd_input.drawWithStyle(bottom_bar, .{ .bg = Colors.light_blue });
+            bottom_bar.fill(.{ .style = .{ .bg = visual_settings.cmd_colors.commands_background } });
+            cmd_input.drawWithStyle(bottom_bar, .{ .bg = visual_settings.cmd_colors.commands_background });
 
             const message = cmd_input.buf.firstHalf();
             try command_helper.draw(win, message);

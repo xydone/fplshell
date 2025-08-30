@@ -104,8 +104,7 @@ pub const Player = struct {
     }
 };
 
-const Color = Colors.Color;
 const Teams = @import("fpl.zig").Teams;
-const Colors = @import("colors.zig");
+const Color = @import("colors.zig").Color;
 
 const std = @import("std");

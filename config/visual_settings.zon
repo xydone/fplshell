@@ -1,6 +1,4 @@
 .{
-    .background_color = null,
-    .font_color = null,
     .team_colors = .{
         //  arsenal
         .{ 168, 34, 36 },
@@ -42,5 +40,14 @@
         .{ 122, 38, 58 },
         //  wolverhampton
         .{ 253, 185, 19 },
+    },
+    .terminal_colors = .{
+        // available options: background, font,
+    },
+    .table_colors = .{
+        //  available options: captain, vice_captain, active_row, selected, not_selected
+    },
+    .cmd_colors = .{
+        // available options: commands_background, input_background, active_text, inactive_text, hint_text
     },
 }

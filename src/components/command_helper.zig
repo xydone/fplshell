@@ -1,10 +1,12 @@
 commands: FilteredView(Command, predicate),
+visual_settings: VisualSettings,
 
 const Self = @This();
 
-pub fn init(commands: []Command) Self {
+pub fn init(commands: []Command, visual_settings: VisualSettings) Self {
     return Self{
         .commands = .init(commands),
+        .visual_settings = visual_settings,
     };
 }
 
@@ -20,12 +22,11 @@ fn predicate(cmd: *const Command, text: []const u8) bool {
     return false;
 }
 
-const bg_color = Colors.dark_blue;
-
 pub fn draw(self: *Self, win: Window, phrase: []const u8) !void {
-    const active_style: vaxis.Cell.Style = .{ .bg = bg_color, .fg = Colors.white };
-    const inactive_style: vaxis.Cell.Style = .{ .bg = bg_color, .fg = Colors.light_gray };
-    const hint_style: vaxis.Cell.Style = .{ .bg = bg_color, .fg = Colors.light_gray };
+    const colors = self.visual_settings.cmd_colors;
+    const active_style: vaxis.Cell.Style = .{ .bg = colors.input_background, .fg = colors.active_text };
+    const inactive_style: vaxis.Cell.Style = .{ .bg = colors.input_background, .fg = colors.inactive_text };
+    const hint_style: vaxis.Cell.Style = .{ .bg = colors.input_background, .fg = colors.hint_text };
     var row: i17 = 0;
     defer self.commands.reset();
 
@@ -42,7 +43,7 @@ pub fn draw(self: *Self, win: Window, phrase: []const u8) !void {
             .width = win.width,
             .height = 1,
         });
-        bar.fill(.{ .style = .{ .bg = bg_color } });
+        bar.fill(.{ .style = .{ .bg = colors.input_background } });
 
         const segment = Segment{
             .text = command.phrases[0], //TODO: better way of doing this
@@ -80,7 +81,7 @@ pub fn draw(self: *Self, win: Window, phrase: []const u8) !void {
     }
 }
 
-const Colors = @import("../colors.zig");
+const VisualSettings = @import("../config.zig").VisualSettings;
 
 const Command = @import("../commands/command.zig");
 const FilteredView = @import("../util/filtered_view.zig").FilteredView;

@@ -62,14 +62,64 @@ pub const TeamFile = struct {
 
 pub const VisualSettings = struct {
     team_colors: [][3]u8,
-    background_color: Color,
-    font_color: Color,
+    terminal_colors: TerminalColors,
+    table_colors: TableColors,
+    cmd_colors: CmdColors,
+
+    const TerminalColors = struct {
+        background: Color,
+        font: Color,
+    };
+
+    const TableColors = struct {
+        captain: Color,
+        vice_captain: Color,
+        active_row: Color,
+        selected: Color,
+        not_selected: Color,
+
+        const default_captain: Color = .{ .rgb = .{ 239, 191, 4 } };
+        const default_vice_captain: Color = .{ .rgb = .{ 196, 196, 196 } };
+        const default_active_row: Color = .{ .rgb = .{ 50, 133, 166 } };
+        const default_selected: Color = .{ .rgb = .{ 0, 0, 0 } };
+        const default_not_selected: Color = .{ .rgb = .{ 0, 0, 0 } };
+    };
+
+    const CmdColors = struct {
+        commands_background: Color,
+        input_background: Color,
+        active_text: Color,
+        inactive_text: Color,
+        hint_text: Color,
+
+        const default_commands_background: Color = .{ .rgb = .{ 50, 133, 166 } };
+        const default_input_background: Color = .{ .rgb = .{ 24, 95, 122 } };
+        const default_active_text: Color = .{ .rgb = .{ 255, 255, 255 } };
+        const default_inactive_text: Color = .{ .rgb = .{ 182, 182, 182 } };
+        const default_hint_text: Color = .{ .rgb = .{ 182, 182, 182 } };
+    };
 };
 
 pub const VisualSettingsFile = struct {
     team_colors: [][3]u8,
-    background_color: ?[3]u8,
-    font_color: ?[3]u8,
+    terminal_colors: struct {
+        background: ?[3]u8 = null,
+        font: ?[3]u8 = null,
+    },
+    table_colors: struct {
+        captain: ?[3]u8 = null,
+        vice_captain: ?[3]u8 = null,
+        active_row: ?[3]u8 = null,
+        selected: ?[3]u8 = null,
+        not_selected: ?[3]u8 = null,
+    },
+    cmd_colors: struct {
+        commands_background: ?[3]u8 = null,
+        input_background: ?[3]u8 = null,
+        active_text: ?[3]u8 = null,
+        inactive_text: ?[3]u8 = null,
+        hint_text: ?[3]u8 = null,
+    },
 
     const path = "config/visual_settings.zon";
 
@@ -80,11 +130,30 @@ pub const VisualSettingsFile = struct {
         zon.parse.free(allocator, self);
     }
 
+    inline fn toColor(opt: ?[3]u8, default: Color) Color {
+        return if (opt) |rgb| Color{ .rgb = rgb } else default;
+    }
     pub fn toVisualSettings(self: VisualSettingsFile) VisualSettings {
         return .{
             .team_colors = self.team_colors,
-            .background_color = if (self.background_color) |rgb| Color{ .rgb = rgb } else .default,
-            .font_color = if (self.background_color) |rgb| Color{ .rgb = rgb } else .default,
+            .terminal_colors = .{
+                .background = toColor(self.terminal_colors.background, .default),
+                .font = toColor(self.terminal_colors.background, .default),
+            },
+            .table_colors = .{
+                .captain = toColor(self.table_colors.captain, VisualSettings.TableColors.default_captain),
+                .vice_captain = toColor(self.table_colors.vice_captain, VisualSettings.TableColors.default_vice_captain),
+                .active_row = toColor(self.table_colors.active_row, VisualSettings.TableColors.default_active_row),
+                .selected = toColor(self.table_colors.selected, VisualSettings.TableColors.default_selected),
+                .not_selected = toColor(self.table_colors.not_selected, VisualSettings.TableColors.default_not_selected),
+            },
+            .cmd_colors = .{
+                .commands_background = toColor(self.cmd_colors.commands_background, VisualSettings.CmdColors.default_commands_background),
+                .input_background = toColor(self.cmd_colors.input_background, VisualSettings.CmdColors.default_input_background),
+                .active_text = toColor(self.cmd_colors.active_text, VisualSettings.CmdColors.default_active_text),
+                .inactive_text = toColor(self.cmd_colors.inactive_text, VisualSettings.CmdColors.default_inactive_text),
+                .hint_text = toColor(self.cmd_colors.hint_text, VisualSettings.CmdColors.default_hint_text),
+            },
         };
     }
 };

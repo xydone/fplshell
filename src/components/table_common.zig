@@ -8,8 +8,8 @@ pub fn init(segment_text: ?[]const u8, context: *TableContext, visual_settings: 
     const segment: ?Segment = if (segment_text) |text| .{
         .text = text,
         .style = .{
-            .bg = visual_settings.background_color,
-            .fg = visual_settings.font_color,
+            .bg = visual_settings.terminal_colors.background,
+            .fg = visual_settings.terminal_colors.font,
         },
     } else null;
     return .{
@@ -19,22 +19,16 @@ pub fn init(segment_text: ?[]const u8, context: *TableContext, visual_settings: 
     };
 }
 
-// Colors
-pub const active_row: Color = Colors.light_blue;
-pub const selected_row: Color = Colors.black;
-pub const selected_table: Color = Colors.black;
-pub const normal_table: Color = Colors.black;
-
 pub fn makeActive(self: *Self) void {
     self.context.active = true;
-    self.context.row_bg_1 = selected_table;
-    self.context.row_bg_2 = selected_table;
+    self.context.row_bg_1 = self.visual_settings.table_colors.selected;
+    self.context.row_bg_2 = self.visual_settings.table_colors.selected;
 }
 
 pub fn makeNormal(self: *Self) void {
     self.context.active = false;
-    self.context.row_bg_1 = normal_table;
-    self.context.row_bg_2 = normal_table;
+    self.context.row_bg_1 = self.visual_settings.table_colors.not_selected;
+    self.context.row_bg_2 = self.visual_settings.table_colors.not_selected;
 }
 
 pub fn moveDown(self: *Self) void {
@@ -96,8 +90,6 @@ const calcColWidth = Table.calcColWidth;
 
 const Player = @import("../types.zig").Player;
 const GameweekSelection = @import("../gameweek_selection.zig");
-
-const Colors = @import("../colors.zig");
 
 const std = @import("std");
 const fmt = std.fmt;
