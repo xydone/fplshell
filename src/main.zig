@@ -1,9 +1,8 @@
 const command_list = [_]type{
     Go,
-    Refresh,
     Search,
     Reset,
-    Position,
+    Filter,
     Sort,
     Quit,
     Horizon,
@@ -357,17 +356,7 @@ pub fn main() !void {
                                                 },
                                             };
                                         },
-                                        Refresh => {
-                                            Refresh.handle(command, .{
-                                                .allocator = allocator,
-                                                .static_data = &static_data,
-                                                .fixtures_data = &fixtures_data,
-                                            }) catch |err| switch (err) {
-                                                Refresh.Errors.FailedToRefetch => {
-                                                    try error_message.setErrorMessage("Failed to fetch data!", .cmd);
-                                                },
-                                            };
-                                        },
+
                                         Search => {
                                             Search.handle(command, .{
                                                 .allocator = event_alloc,
@@ -394,18 +383,23 @@ pub fn main() !void {
                                                 Sort.Errors.OOM => return err,
                                             };
                                         },
-                                        Position => {
-                                            Position.handle(command, .{
+                                        Filter => {
+                                            Filter.handle(command, .{
                                                 .it = it,
                                                 .player_table = &search_table,
                                                 .filtered_players = &filtered_players,
                                                 .all_players = all_players,
                                             }) catch |err| switch (err) {
-                                                Position.Errors.EmptyString => {},
-                                                Position.Errors.InvalidPosition => {
+                                                Filter.Errors.MissingValue => {
+                                                    try error_message.setErrorMessage("You entered a filter without a value!", .cmd);
+                                                },
+                                                Filter.Errors.InvalidFilter => {
+                                                    try error_message.setErrorMessage("You must enter a valid filter!", .cmd);
+                                                },
+                                                Filter.Errors.InvalidPosition => {
                                                     try error_message.setErrorMessage("You must enter a valid position!", .cmd);
                                                 },
-                                                Position.Errors.OOM => return err,
+                                                Filter.Errors.OOM => return err,
                                             };
                                         },
                                         Reset => {
@@ -753,10 +747,9 @@ const GetFixtures = @import("fpl.zig").GetFixtures;
 const GetEntryHistory = @import("fpl.zig").GetEntryHistory;
 
 const Go = @import("commands/go.zig");
-const Refresh = @import("commands/refresh.zig");
 const Search = @import("commands/search.zig");
 const Reset = @import("commands/reset.zig");
-const Position = @import("commands/position.zig");
+const Filter = @import("commands/filter.zig");
 const Sort = @import("commands/sort.zig");
 const Quit = @import("commands/quit.zig");
 const Horizon = @import("commands/horizon.zig");

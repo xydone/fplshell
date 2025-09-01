@@ -30,10 +30,22 @@ pub fn draw(self: *Self, win: Window, phrase: []const u8) !void {
     var row: i17 = 0;
     defer self.commands.reset();
 
-    const active_parameter = std.mem.count(u8, phrase, " ");
+    // the reason its a variable and not a constant is because we can change it in the case of an unlimited parameter
+    var active_parameter = std.mem.count(u8, phrase, " ");
     while (self.commands.next(phrase)) |command| {
         if (command.params) |params| {
-            if (params.len < active_parameter) continue;
+            if (params.len < active_parameter) {
+                switch (params[params.len - 1].count) {
+                    .limited => |limit| {
+                        // we have gone past the limit
+                        if (params.len + limit > active_parameter) {
+                            continue;
+                        }
+                    },
+                    //NOTE: we dont subtract 1 as we need to ignore the command part and we only have to do this if there are parameters. should be fine.
+                    .unlimited => active_parameter = params.len,
+                }
+            }
         }
         defer row += 1;
         var x_offset: u16 = 0;

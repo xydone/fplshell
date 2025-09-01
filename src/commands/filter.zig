@@ -1,15 +1,16 @@
-var COMMANDS = [_][]const u8{ "position", "pos" };
+var COMMANDS = [_][]const u8{"filter"};
 
 var PARAMS = [_]CommandParams{
     .{
-        .name = enumToString(Position),
-        .description = "The position you want to filter by.",
+        .name = "filter=value",
+        .description = "The type of filter you want to apply. ",
+        .count = .{ .unlimited = {} },
     },
 };
 
 pub const description = Command{
     .phrases = &COMMANDS,
-    .description = "Filters the player database by positions",
+    .description = "Applies filters on the player data. In case of duplicates, the last entry counts.",
     .params = &PARAMS,
 };
 
@@ -27,7 +28,11 @@ pub const Params = struct {
     all_players: std.ArrayList(Player),
 };
 
-pub const Errors = error{ EmptyString, InvalidPosition, OOM };
+pub const Errors = error{ InvalidPosition, OOM, MissingValue, InvalidFilter };
+
+const Filters = enum {
+    position,
+};
 
 fn call(params: Params) Errors!void {
     const it = params.it;
@@ -39,13 +44,24 @@ fn call(params: Params) Errors!void {
     player_table.table.moveTo(0);
 
     // if nothing has been entered, just continue early
-    if (string.len == 0) return error.EmptyString;
 
-    const pos = std.meta.stringToEnum(Position, string) orelse return error.InvalidPosition;
-    // flush table
-    filtered_players.clearRetainingCapacity();
-    for (all_players.items) |player| {
-        if (player.position.? == pos) filtered_players.append(player) catch return error.OOM;
+    var filters = std.mem.tokenizeScalar(u8, string, ' ');
+    while (filters.next()) |filter_string| {
+        var tokens = std.mem.tokenizeScalar(u8, filter_string, '=');
+        const command = tokens.next().?;
+        const value = tokens.next() orelse return error.MissingValue;
+
+        const filter = std.meta.stringToEnum(Filters, command) orelse return error.InvalidFilter;
+        switch (filter) {
+            .position => {
+                const pos = std.meta.stringToEnum(Position, value) orelse return error.InvalidPosition;
+                // flush table
+                filtered_players.clearRetainingCapacity();
+                for (all_players.items) |player| {
+                    if (player.position.? == pos) filtered_players.append(player) catch return error.OOM;
+                }
+            },
+        }
     }
 }
 
