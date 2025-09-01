@@ -1,3 +1,7 @@
 .zig-cache/
 zig-out/
 data/
+
+config/*
+!config/config.zon
+!config/visual_settings.zon
