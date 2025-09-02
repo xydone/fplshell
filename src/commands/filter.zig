@@ -37,6 +37,8 @@ pub const Errors = error{
 const Filters = enum(u8) {
     position,
     price,
+    asc,
+    desc,
 };
 
 const PriceErrors = error{
@@ -62,14 +64,24 @@ fn call(params: Params) Errors!void {
     while (filters.next()) |filter_string| {
         var tokens = std.mem.tokenizeScalar(u8, filter_string, '=');
         const command = tokens.next().?;
-        const value = tokens.next() orelse return error.MissingValue;
-
         const filter = std.meta.stringToEnum(Filters, command) orelse return error.InvalidFilter;
+
+        const value: ?[]const u8 = value: {
+            // if we are dealing with asc or desc, we dont need to adhere to the "filter_type=value" format
+            if (filter == .asc or filter == .desc) break :value null;
+            break :value tokens.next() orelse return error.MissingValue;
+        };
 
         player_table.table.moveTo(0);
         switch (filter) {
+            .asc => {
+                std.mem.sort(Player, filtered_players.items, {}, Player.lessThan);
+            },
+            .desc => {
+                std.mem.sort(Player, filtered_players.items, {}, Player.greaterThan);
+            },
             .position => {
-                const pos = std.meta.stringToEnum(Position, value) orelse return error.InvalidPosition;
+                const pos = std.meta.stringToEnum(Position, value.?) orelse return error.InvalidPosition;
                 // flush table
                 filtered_players.clearRetainingCapacity();
                 for (all_players.items) |player| {
@@ -77,20 +89,32 @@ fn call(params: Params) Errors!void {
                 }
             },
             .price => blk: {
-                // "If `delimiter` does not exist in buffer"
-                var value_tokens = std.mem.tokenizeSequence(u8, value, "..");
-                const start_token = value_tokens.next();
-                const end_token = value_tokens.next();
+                // "If `..` does not exist in buffer the iterator will return `buffer`, null, in that order.""
+                // If `..` is the first thing in the buffer, the iteration will return an empty string and the rest
+                var value_tokens = std.mem.splitSequence(u8, value.?, "..");
+                const parseTokens = struct {
+                    fn func(iterator: *std.mem.SplitIterator(u8, .sequence)) ?[]const u8 {
+                        const next = iterator.next();
+                        if (next) |val| {
+                            if (val.len == 0) return null;
+                        }
+                        return next;
+                    }
+                }.func;
+                const start_token = parseTokens(&value_tokens);
+                const end_token = parseTokens(&value_tokens);
 
-                // if we have two null values, this means we do a single price filter (effectively start=price=end)
+                // if we have two null values, this means we do a single price filter (effectively start = price = end)
                 // NOTE: exits early
-                if (start_token) |token| if (token.len == value.len) {
-                    const price = std.fmt.parseFloat(f32, value) catch return error.PriceInvalid;
-                    // flush table
-                    filtered_players.clearRetainingCapacity();
-                    for (all_players.items) |player| if (player.price.? == price) filtered_players.append(player) catch return error.OOM;
-                    break :blk;
-                };
+                if (start_token) |token| {
+                    if (token.len == value.?.len) {
+                        const price = std.fmt.parseFloat(f32, value.?) catch return error.PriceInvalid;
+                        // flush table
+                        filtered_players.clearRetainingCapacity();
+                        for (all_players.items) |player| if (player.price.? == price) filtered_players.append(player) catch return error.OOM;
+                        break :blk;
+                    }
+                } else if (end_token == null) return error.RangeMissing;
 
                 const start: ?f32, const end: ?f32 = try struct {
                     /// asserts we have a valid range
