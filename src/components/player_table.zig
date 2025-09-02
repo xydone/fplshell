@@ -123,6 +123,10 @@ fn drawInner(
     }
 
     // Rows
+
+    // if the data list is empty, we dont need to draw any rows
+    if (data_list.items.len == 0) return;
+
     if (table_ctx.active_content_fn == null) table_ctx.active_y_off = 0;
     const max_items: u16 =
         if (data_list.items.len > table_win.height -| 1) table_win.height -| 1 else @intCast(data_list.items.len);

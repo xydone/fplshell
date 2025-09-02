@@ -3,7 +3,6 @@ const command_list = [_]type{
     Search,
     Reset,
     Filter,
-    Sort,
     Quit,
     Horizon,
     Save,
@@ -371,18 +370,7 @@ pub fn main() !void {
                                                 Search.Errors.OOM => return err,
                                             };
                                         },
-                                        Sort => {
-                                            Sort.handle(command, .{
-                                                .it = &it,
-                                                .filtered_players = &filtered_players,
-                                            }) catch |err| switch (err) {
-                                                Sort.Errors.EmptyString => {},
-                                                Sort.Errors.UnknownSortType => {
-                                                    try error_message.setErrorMessage("You must enter a valid sort type!", .cmd);
-                                                },
-                                                Sort.Errors.OOM => return err,
-                                            };
-                                        },
+
                                         Filter => {
                                             Filter.handle(command, .{
                                                 .it = it,
@@ -492,6 +480,13 @@ pub fn main() !void {
                         }
                     },
                     .search_table => search_table: {
+                        if (key.matches(Key.right, .{})) {
+                            active_menu = .selected;
+                            selected.table.makeActive();
+                            search_table.table.makeNormal();
+                        }
+                        // if the list is empty, the selected row will still be considered to be 1 or whatever it was before that, thus causing a runtime panic
+                        if (filtered_players.items.len == 0 or search_table.table.context.row >= filtered_players.items.len) break :search_table;
                         const currently_selected_player = filtered_players.items[search_table.table.context.row];
                         if (key.matchExact(Key.enter, .{})) {
                             season_selections.appendPlayer(currently_selected_player, .{ .propagate = true }) catch |err| {
@@ -503,10 +498,6 @@ pub fn main() !void {
                             };
                             // update the view for rendering
                             gw_selection = season_selections.getActiveGameweek();
-                        } else if (key.matches(Key.right, .{})) {
-                            active_menu = .selected;
-                            selected.table.makeActive();
-                            search_table.table.makeNormal();
                         }
                     },
                     .selected => selected: {
@@ -757,7 +748,6 @@ const Go = @import("commands/go.zig");
 const Search = @import("commands/search.zig");
 const Reset = @import("commands/reset.zig");
 const Filter = @import("commands/filter.zig");
-const Sort = @import("commands/sort.zig");
 const Quit = @import("commands/quit.zig");
 const Horizon = @import("commands/horizon.zig");
 const Save = @import("commands/save.zig");
