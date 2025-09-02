@@ -2,7 +2,7 @@ var COMMANDS = [_][]const u8{"filter"};
 
 var PARAMS = [_]CommandParams{
     .{
-        .name = "filter=value",
+        .name = "filter=value | asc | desc",
         .description = "The type of filter you want to apply. ",
         .count = .{ .unlimited = {} },
     },
