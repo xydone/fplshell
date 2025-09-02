@@ -28,12 +28,28 @@ pub const Params = struct {
     all_players: std.ArrayList(Player),
 };
 
-pub const Errors = error{ InvalidPosition, OOM, MissingValue, InvalidFilter };
+pub const Errors = error{
+    OOM,
+    MissingValue,
+    InvalidFilter,
+} || PriceErrors || PositionErrors;
 
-const Filters = enum {
+const Filters = enum(u8) {
     position,
+    price,
 };
 
+const PriceErrors = error{
+    StartPriceInvalid,
+    EndPriceInvalid,
+    /// Only returned when there is no price range and one single price is filtered
+    PriceInvalid,
+    RangeMissing,
+};
+
+const PositionErrors = error{
+    InvalidPosition,
+};
 fn call(params: Params) Errors!void {
     const it = params.it;
     const player_table = params.player_table;
@@ -41,9 +57,6 @@ fn call(params: Params) Errors!void {
     const all_players = params.all_players;
 
     const string = it.rest();
-    player_table.table.moveTo(0);
-
-    // if nothing has been entered, just continue early
 
     var filters = std.mem.tokenizeScalar(u8, string, ' ');
     while (filters.next()) |filter_string| {
@@ -52,6 +65,8 @@ fn call(params: Params) Errors!void {
         const value = tokens.next() orelse return error.MissingValue;
 
         const filter = std.meta.stringToEnum(Filters, command) orelse return error.InvalidFilter;
+
+        player_table.table.moveTo(0);
         switch (filter) {
             .position => {
                 const pos = std.meta.stringToEnum(Position, value) orelse return error.InvalidPosition;
@@ -59,6 +74,41 @@ fn call(params: Params) Errors!void {
                 filtered_players.clearRetainingCapacity();
                 for (all_players.items) |player| {
                     if (player.position.? == pos) filtered_players.append(player) catch return error.OOM;
+                }
+            },
+            .price => blk: {
+                // "If `delimiter` does not exist in buffer"
+                var value_tokens = std.mem.tokenizeSequence(u8, value, "..");
+                const start_token = value_tokens.next();
+                const end_token = value_tokens.next();
+
+                // if we have two null values, this means we do a single price filter (effectively start=price=end)
+                // NOTE: exits early
+                if (start_token) |token| if (token.len == value.len) {
+                    const price = std.fmt.parseFloat(f32, value) catch return error.PriceInvalid;
+                    // flush table
+                    filtered_players.clearRetainingCapacity();
+                    for (all_players.items) |player| if (player.price.? == price) filtered_players.append(player) catch return error.OOM;
+                    break :blk;
+                };
+
+                const start: ?f32, const end: ?f32 = try struct {
+                    /// asserts we have a valid range
+                    pub fn fromStrings(start_string: ?[]const u8, end_string: ?[]const u8) !std.meta.Tuple(&.{ ?f32, ?f32 }) {
+                        std.debug.assert(start_string != null or end_string != null);
+                        return .{
+                            if (start_string) |str| std.fmt.parseFloat(f32, str) catch return error.StartPriceInvalid else null,
+                            if (end_string) |str| std.fmt.parseFloat(f32, str) catch return error.EndPriceInvalid else null,
+                        };
+                    }
+                }.fromStrings(start_token, end_token);
+
+                // flush table
+                filtered_players.clearRetainingCapacity();
+                for (all_players.items) |player| {
+                    const price = player.price.?;
+                    // checks if start <= value <= end is true with short circuiting
+                    if ((start == null or price >= start.?) and (end == null or price <= end.?)) filtered_players.append(player) catch return error.OOM;
                 }
             },
         }

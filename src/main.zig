@@ -399,6 +399,13 @@ pub fn main() !void {
                                                 Filter.Errors.InvalidPosition => {
                                                     try error_message.setErrorMessage("You must enter a valid position!", .cmd);
                                                 },
+                                                // TODO: handle them individually, maybe
+                                                Filter.Errors.StartPriceInvalid, Filter.Errors.EndPriceInvalid, Filter.Errors.RangeMissing => {
+                                                    try error_message.setErrorMessage("You must enter a valid price range!", .cmd);
+                                                },
+                                                Filter.Errors.PriceInvalid => {
+                                                    try error_message.setErrorMessage("You must enter a valid price!", .cmd);
+                                                },
                                                 Filter.Errors.OOM => return err,
                                             };
                                         },
