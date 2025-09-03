@@ -6,7 +6,7 @@ var PARAMS = [_]CommandParams{
     },
 };
 
-const base_path = "data/plans/";
+const base_path = "data/plans";
 
 pub const description = Command{
     .phrases = &COMMANDS,
