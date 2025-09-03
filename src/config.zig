@@ -62,6 +62,7 @@ pub const TeamFile = struct {
 
 pub const VisualSettings = struct {
     team_colors: [][3]u8,
+    have_scroll_bar: bool,
     terminal_colors: TerminalColors,
     table_colors: TableColors,
     cmd_colors: CmdColors,
@@ -102,6 +103,7 @@ pub const VisualSettings = struct {
 
 pub const VisualSettingsFile = struct {
     team_colors: [][3]u8,
+    have_scroll_bar: bool = true,
     terminal_colors: struct {
         background: ?[3]u8 = null,
         font: ?[3]u8 = null,
@@ -136,6 +138,7 @@ pub const VisualSettingsFile = struct {
     pub fn toVisualSettings(self: VisualSettingsFile) VisualSettings {
         return .{
             .team_colors = self.team_colors,
+            .have_scroll_bar = self.have_scroll_bar,
             .terminal_colors = .{
                 .background = toColor(self.terminal_colors.background, .default),
                 .font = toColor(self.terminal_colors.background, .default),

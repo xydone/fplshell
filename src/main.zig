@@ -551,6 +551,7 @@ pub fn main() !void {
         // running total of current offsets
         var x_off: i17 = 1;
         const y_off: i17 = 2;
+
         // left table
         var search_table_border_menus = [_]Menu{.search_table};
         const search_table_win = createChild(.{
@@ -573,6 +574,25 @@ pub fn main() !void {
             search_table_win,
             filtered_players,
         );
+
+        const scroll_bar: vaxis.widgets.Scrollbar = .{
+            .total = filtered_players.items.len,
+            .view_size = search_table_win.height,
+            .top = search_table.table.context.row,
+            .character = .{ .grapheme = "▌", .width = 1 },
+        };
+
+        // draw a scroll bar only when the search window is active
+        if (active_menu == .search_table and visual_settings.have_scroll_bar == true) {
+            const scroll_bar_win = win.child(.{
+                .x_off = win.width / 3 + 1,
+                .y_off = y_off,
+                .width = win.width / 3,
+                .height = ROWS_PER_TABLE + 2,
+            });
+
+            scroll_bar.draw(scroll_bar_win);
+        }
 
         // selected players table
         x_off += search_table_win.width + 2;

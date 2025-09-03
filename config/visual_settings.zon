@@ -50,4 +50,6 @@
     .cmd_colors = .{
         // available options: commands_background, input_background, active_text, inactive_text, hint_text
     },
+    // set to false to turn off scroll bar next to search table
+    .have_scroll_bar = true,
 }
