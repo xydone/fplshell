@@ -25,7 +25,6 @@ pub const Params = struct {
     it: std.mem.TokenIterator(u8, .sequence),
     player_table: *Table,
     filtered_players: *std.ArrayList(Player),
-    all_players: std.ArrayList(Player),
 };
 
 pub const Errors = error{
@@ -37,6 +36,7 @@ pub const Errors = error{
 const Filters = enum(u8) {
     position,
     price,
+    team,
     asc,
     desc,
 };
@@ -56,12 +56,15 @@ fn call(params: Params) Errors!void {
     const it = params.it;
     const player_table = params.player_table;
     const filtered_players = params.filtered_players;
-    const all_players = params.all_players;
 
     const string = it.rest();
 
     var filters = std.mem.tokenizeScalar(u8, string, ' ');
+
     while (filters.next()) |filter_string| {
+        // NOTE: player_pot is put inside the while loop to allow for filter chaining
+        // the pool of players that is available for the filter
+        const player_pot = filtered_players.items;
         var tokens = std.mem.tokenizeScalar(u8, filter_string, '=');
         const command = tokens.next().?;
         const filter = std.meta.stringToEnum(Filters, command) orelse return error.InvalidFilter;
@@ -80,11 +83,18 @@ fn call(params: Params) Errors!void {
             .desc => {
                 std.mem.sort(Player, filtered_players.items, {}, Player.greaterThan);
             },
+            .team => {
+                // flush table
+                filtered_players.clearRetainingCapacity();
+                for (player_pot) |player| {
+                    if (containsAtLeastIgnoreCase(u8, player.team_name.?, 1, value.?)) filtered_players.append(player) catch return error.OOM;
+                }
+            },
             .position => {
                 const pos = std.meta.stringToEnum(Position, value.?) orelse return error.InvalidPosition;
                 // flush table
                 filtered_players.clearRetainingCapacity();
-                for (all_players.items) |player| {
+                for (player_pot) |player| {
                     if (player.position.? == pos) filtered_players.append(player) catch return error.OOM;
                 }
             },
@@ -111,7 +121,7 @@ fn call(params: Params) Errors!void {
                         const price = std.fmt.parseFloat(f32, value.?) catch return error.PriceInvalid;
                         // flush table
                         filtered_players.clearRetainingCapacity();
-                        for (all_players.items) |player| if (player.price.? == price) filtered_players.append(player) catch return error.OOM;
+                        for (player_pot) |player| if (player.price.? == price) filtered_players.append(player) catch return error.OOM;
                         break :blk;
                     }
                 } else if (end_token == null) return error.RangeMissing;
@@ -129,7 +139,7 @@ fn call(params: Params) Errors!void {
 
                 // flush table
                 filtered_players.clearRetainingCapacity();
-                for (all_players.items) |player| {
+                for (player_pot) |player| {
                     const price = player.price.?;
                     // checks if start <= value <= end is true with short circuiting
                     if ((start == null or price >= start.?) and (end == null or price <= end.?)) filtered_players.append(player) catch return error.OOM;
@@ -143,6 +153,22 @@ pub fn handle(cmd: []const u8, params: Params) Errors!void {
     if (shouldCall(cmd)) {
         try call(params);
     }
+}
+
+/// identical as `std.mem.containsAtLeast`, except case insensitive
+fn containsAtLeastIgnoreCase(comptime T: type, haystack: []const T, expected_count: usize, needle: []const T) bool {
+    std.debug.assert(needle.len > 0);
+    if (expected_count == 0) return true;
+
+    var i: usize = 0;
+    var found: usize = 0;
+
+    while (std.ascii.indexOfIgnoreCasePos(haystack, i, needle)) |idx| {
+        i = idx + needle.len;
+        found += 1;
+        if (found == expected_count) return true;
+    }
+    return false;
 }
 
 const enumToString = @import("../util/enumToString.zig").enumToString;

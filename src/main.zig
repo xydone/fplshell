@@ -376,7 +376,6 @@ pub fn main() !void {
                                                 .it = it,
                                                 .player_table = &search_table,
                                                 .filtered_players = &filtered_players,
-                                                .all_players = all_players,
                                             }) catch |err| switch (err) {
                                                 Filter.Errors.MissingValue => {
                                                     try error_message.setErrorMessage("You entered a filter without a value!", .cmd);
