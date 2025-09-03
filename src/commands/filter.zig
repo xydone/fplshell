@@ -2,7 +2,7 @@ var COMMANDS = [_][]const u8{"filter"};
 
 var PARAMS = [_]CommandParams{
     .{
-        .name = "filter=value | asc | desc",
+        .name = "filter=value | asc | desc | reset",
         .description = "The type of filter you want to apply. ",
         .count = .{ .unlimited = {} },
     },
@@ -25,6 +25,7 @@ pub const Params = struct {
     it: std.mem.TokenIterator(u8, .sequence),
     player_table: *Table,
     filtered_players: *std.ArrayList(Player),
+    all_players: std.ArrayList(Player),
 };
 
 pub const Errors = error{
@@ -37,6 +38,9 @@ const Filters = enum(u8) {
     position,
     price,
     team,
+
+    // special filters, dont follow "type=value" syntax
+    reset,
     asc,
     desc,
 };
@@ -56,6 +60,7 @@ fn call(params: Params) Errors!void {
     const it = params.it;
     const player_table = params.player_table;
     const filtered_players = params.filtered_players;
+    const all_players = params.all_players;
 
     const string = it.rest();
 
@@ -71,23 +76,23 @@ fn call(params: Params) Errors!void {
 
         const value: ?[]const u8 = value: {
             // if we are dealing with asc or desc, we dont need to adhere to the "filter_type=value" format
-            if (filter == .asc or filter == .desc) break :value null;
+            if (filter == .asc or filter == .desc or filter == .reset) break :value null;
             break :value tokens.next() orelse return error.MissingValue;
         };
 
         player_table.table.moveTo(0);
         switch (filter) {
-            .asc => {
-                std.mem.sort(Player, filtered_players.items, {}, Player.lessThan);
-            },
-            .desc => {
-                std.mem.sort(Player, filtered_players.items, {}, Player.greaterThan);
+            .asc => std.mem.sort(Player, filtered_players.items, {}, Player.lessThan),
+            .desc => std.mem.sort(Player, filtered_players.items, {}, Player.greaterThan),
+            .reset => {
+                filtered_players.clearAndFree();
+                filtered_players.appendSlice(all_players.items) catch return error.OOM;
             },
             .team => {
                 // flush table
                 filtered_players.clearRetainingCapacity();
                 for (player_pot) |player| {
-                    if (containsAtLeastIgnoreCase(u8, player.team_name.?, 1, value.?)) filtered_players.append(player) catch return error.OOM;
+                    if (containsAtLeastIgnoreCase(u8, player.team_name.?, 1, value.?)) filtered_players.appendAssumeCapacity(player);
                 }
             },
             .position => {
@@ -95,7 +100,7 @@ fn call(params: Params) Errors!void {
                 // flush table
                 filtered_players.clearRetainingCapacity();
                 for (player_pot) |player| {
-                    if (player.position.? == pos) filtered_players.append(player) catch return error.OOM;
+                    if (player.position.? == pos) filtered_players.appendAssumeCapacity(player);
                 }
             },
             .price => blk: {
@@ -121,7 +126,7 @@ fn call(params: Params) Errors!void {
                         const price = std.fmt.parseFloat(f32, value.?) catch return error.PriceInvalid;
                         // flush table
                         filtered_players.clearRetainingCapacity();
-                        for (player_pot) |player| if (player.price.? == price) filtered_players.append(player) catch return error.OOM;
+                        for (player_pot) |player| if (player.price.? == price) filtered_players.appendAssumeCapacity(player);
                         break :blk;
                     }
                 } else if (end_token == null) return error.RangeMissing;
@@ -142,7 +147,7 @@ fn call(params: Params) Errors!void {
                 for (player_pot) |player| {
                     const price = player.price.?;
                     // checks if start <= value <= end is true with short circuiting
-                    if ((start == null or price >= start.?) and (end == null or price <= end.?)) filtered_players.append(player) catch return error.OOM;
+                    if ((start == null or price >= start.?) and (end == null or price <= end.?)) filtered_players.appendAssumeCapacity(player);
                 }
             },
         }

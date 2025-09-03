@@ -1,7 +1,6 @@
 const command_list = [_]type{
     Go,
     Search,
-    Reset,
     Filter,
     Quit,
     Horizon,
@@ -376,6 +375,7 @@ pub fn main() !void {
                                                 .it = it,
                                                 .player_table = &search_table,
                                                 .filtered_players = &filtered_players,
+                                                .all_players = all_players,
                                             }) catch |err| switch (err) {
                                                 Filter.Errors.MissingValue => {
                                                     try error_message.setErrorMessage("You entered a filter without a value!", .cmd);
@@ -394,14 +394,6 @@ pub fn main() !void {
                                                     try error_message.setErrorMessage("You must enter a valid price!", .cmd);
                                                 },
                                                 Filter.Errors.OOM => return err,
-                                            };
-                                        },
-                                        Reset => {
-                                            Reset.handle(command, .{
-                                                .filtered_players = &filtered_players,
-                                                .all_players = &all_players,
-                                            }) catch |err| switch (err) {
-                                                Reset.Errors.OOM => return err,
                                             };
                                         },
                                         Quit => {
@@ -745,7 +737,6 @@ const GetEntryHistory = @import("fpl.zig").GetEntryHistory;
 
 const Go = @import("commands/go.zig");
 const Search = @import("commands/search.zig");
-const Reset = @import("commands/reset.zig");
 const Filter = @import("commands/filter.zig");
 const Quit = @import("commands/quit.zig");
 const Horizon = @import("commands/horizon.zig");
