@@ -67,9 +67,6 @@ fn call(params: Params) Errors!void {
     var filters = std.mem.tokenizeScalar(u8, string, ' ');
 
     while (filters.next()) |filter_string| {
-        // NOTE: player_pot is put inside the while loop to allow for filter chaining
-        // the pool of players that is available for the filter
-        const player_pot = filtered_players.items;
         var tokens = std.mem.tokenizeScalar(u8, filter_string, '=');
         const command = tokens.next().?;
         const filter = std.meta.stringToEnum(Filters, command) orelse return error.InvalidFilter;
@@ -89,18 +86,17 @@ fn call(params: Params) Errors!void {
                 filtered_players.appendSlice(all_players.items) catch return error.OOM;
             },
             .team => {
-                // flush table
-                filtered_players.clearRetainingCapacity();
-                for (player_pot) |player| {
-                    if (containsAtLeastIgnoreCase(u8, player.team_name.?, 1, value.?)) filtered_players.appendAssumeCapacity(player);
+                var i = filtered_players.items.len;
+                while (i > 0) : (i -= 1) {
+                    if (!containsAtLeastIgnoreCase(u8, filtered_players.items[i - 1].team_name.?, 1, value.?)) _ = filtered_players.swapRemove(i - 1);
                 }
             },
             .position => {
                 const pos = std.meta.stringToEnum(Position, value.?) orelse return error.InvalidPosition;
-                // flush table
-                filtered_players.clearRetainingCapacity();
-                for (player_pot) |player| {
-                    if (player.position.? == pos) filtered_players.appendAssumeCapacity(player);
+                var i = filtered_players.items.len;
+                while (i > 0) : (i -= 1) {
+                    // remove all players that don't have the same position
+                    if (filtered_players.items[i - 1].position.? != pos) _ = filtered_players.swapRemove(i - 1);
                 }
             },
             .price => blk: {
@@ -124,9 +120,11 @@ fn call(params: Params) Errors!void {
                 if (start_token) |token| {
                     if (token.len == value.?.len) {
                         const price = std.fmt.parseFloat(f32, value.?) catch return error.PriceInvalid;
-                        // flush table
-                        filtered_players.clearRetainingCapacity();
-                        for (player_pot) |player| if (player.price.? == price) filtered_players.appendAssumeCapacity(player);
+                        var i = filtered_players.items.len;
+                        while (i > 0) : (i -= 1) {
+                            // remove all players that dont match this price
+                            if (filtered_players.items[i - 1].price.? != price) _ = filtered_players.swapRemove(i - 1);
+                        }
                         break :blk;
                     }
                 } else if (end_token == null) return error.RangeMissing;
@@ -142,12 +140,13 @@ fn call(params: Params) Errors!void {
                     }
                 }.fromStrings(start_token, end_token);
 
-                // flush table
-                filtered_players.clearRetainingCapacity();
-                for (player_pot) |player| {
-                    const price = player.price.?;
+                var i = filtered_players.items.len;
+                while (i > 0) : (i -= 1) {
+                    const price = filtered_players.items[i - 1].price.?;
                     // checks if start <= value <= end is true with short circuiting
-                    if ((start == null or price >= start.?) and (end == null or price <= end.?)) filtered_players.appendAssumeCapacity(player);
+                    const is_valid = (start == null or price >= start.?) and (end == null or price <= end.?);
+                    // remove all players that dont fit in the price range
+                    if (!is_valid) _ = filtered_players.swapRemove(i - 1);
                 }
             },
         }
