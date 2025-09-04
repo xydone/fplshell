@@ -98,10 +98,22 @@ pub const AppendOptions = struct {
 };
 
 pub fn appendPlayer(self: *Self, player: Player, options: AppendOptions) AppendErrors!void {
+    // checks if the player was removed from the team but this function call adds him back to the team.
+    // this "gives" that transfer back to the team.
+    // NOTE: this will probably need to be reimplemented once calls to FPL API for actual team changes gets added.
+    var is_reinsert = true;
+    if (self.active_idx > 0) {
+        const previous_gameweek = self.gameweek_selections[self.active_idx - 1];
+        for (previous_gameweek.players) |maybe_player| if (maybe_player) |previous_player| {
+            if (player.id == previous_player.id) is_reinsert = true;
+        };
+    }
     try self.gameweek_selections[self.active_idx].append(player);
+    if (is_reinsert) self.gameweek_selections[self.active_idx].addFreeTransfers(1);
     if (options.propagate) {
         for (self.gameweek_selections[self.active_idx + 1 ..]) |*gw_selection| {
             gw_selection.append(player) catch break;
+            if (is_reinsert) gw_selection.addFreeTransfers(1);
         }
     }
 }

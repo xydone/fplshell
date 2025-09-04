@@ -533,7 +533,6 @@ pub fn main() !void {
             },
 
             .winsize => |ws| try vx.resize(allocator, tty.anyWriter(), ws),
-            else => {},
         }
 
         const win = vx.window();
@@ -701,7 +700,6 @@ pub fn main() !void {
 const Event = union(enum) {
     key_press: vaxis.Key,
     winsize: vaxis.Winsize,
-    focus_in,
 };
 
 pub fn panic(
