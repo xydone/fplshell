@@ -40,7 +40,7 @@ fn call(params: Params) Errors!LoadResponse {
 
     const name = it.next() orelse return error.EmptyName;
 
-    const file_path = std.fmt.allocPrint(allocator, "{s}/{s}.json", .{ base_path, name }) catch return error.OOM;
+    const file_path = std.fmt.allocPrint(allocator, "{s}/{s}.json", .{ base_path, std.fs.path.basename(name) }) catch return error.OOM;
     defer allocator.free(file_path);
 
     // 200kb
