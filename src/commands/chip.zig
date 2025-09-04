@@ -1,7 +1,7 @@
 var COMMANDS = [_][]const u8{"chip"};
 var PARAMS = [_]CommandParams{
     .{
-        .name = "<?string>",
+        .name = enumToString(Chips.Names),
         .description = "The name of the chip. Empty string remove an existing chip.",
     },
 };
@@ -44,6 +44,8 @@ pub fn handle(cmd: []const u8, params: Params) Errors!void {
         try call(params);
     }
 }
+
+const enumToString = @import("../util/enumToString.zig").enumToString;
 
 const Chips = @import("../types.zig").Chips;
 const SeasonSelection = @import("../season_selection.zig");

@@ -55,6 +55,14 @@ You can see the list of valid commands and their descriptions by typing `/`, `:`
 
 ## Building
 
-_Prerequisites: you must have [Zig 0.14.1](https://ziglang.org/download/#release-0.14.1) installed._
+_Prerequisites: you must have Zig 0.14.1 installed. If you don't have it installed, [**follow the guide**](docs/INSTALLING_ZIG)._
 
-1. `zig build` for a debug build, `zig build -Doptimize=ReleaseFast` for a `ReleaseFast` build. [There are more build modes if you wish to use them.](https://ziglang.org/documentation/0.14.1/#Build-Mode)
+Run this for a debug build:
+
+      zig build
+
+Run this for a release build.
+
+      zig build -Doptimize=ReleaseFast
+
+[There are more build modes if you wish to use them.](https://ziglang.org/documentation/0.14.1/#Build-Mode)

@@ -3,7 +3,7 @@ const std = @import("std");
 pub fn enumToString(comptime T: type) []const u8 {
     return comptime blk: {
         var total_len: usize = 0;
-        const border = "|";
+        const border = " | ";
         const start = "<";
         const end = ">";
 
